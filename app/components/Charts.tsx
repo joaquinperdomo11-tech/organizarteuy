@@ -114,7 +114,7 @@ const renderCustomLabel = ({
 
 export function StatusChart({ data }: StatusChartProps) {
   const pieData = data.map((d) => ({
-    name: StatusLabel[d.status] || d.tipo,
+    name: d.tipo,
     value: d.count,
     color: d.color,
   }));
