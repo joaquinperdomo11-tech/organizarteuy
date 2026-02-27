@@ -381,8 +381,8 @@ function processData(orders: Order[]): DashboardData {
     };
   }
 
-  const currentMonth = calcPeriodSummary(currentMonthOrders);
-  const prevMonth = calcPeriodSummary(prevMonthOrders);
+ const currentMonth = calcPeriodSummary(currentMonthOrders);
+  const prevMonthData = calcPeriodSummary(prevMonthOrders);
 
   // Day-by-day for current month and prev month
   const revenueCurrentMonth: { day: number; revenue: number; margen: number; orders: number }[] = [];
@@ -433,7 +433,7 @@ function processData(orders: Order[]): DashboardData {
     heatmap,
     skuPerformance,
     currentMonth,
-    prevMonth,
+    prevMonthData,
     revenueCurrentMonth,
     revenuePrevMonth,
   };
