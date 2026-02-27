@@ -433,7 +433,7 @@ function processData(orders: Order[]): DashboardData {
     heatmap,
     skuPerformance,
     currentMonth,
-    prevMonthData,
+    prevMonth: prevMonthData,
     revenueCurrentMonth,
     revenuePrevMonth,
   };
