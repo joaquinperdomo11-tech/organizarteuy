@@ -1,9 +1,3 @@
-// ─────────────────────────────────────────────────────────────────
-// Fuente de datos: Google Apps Script Webapp
-// No requiere Google Cloud ni Service Account.
-// Solo configurá APPS_SCRIPT_URL en tus variables de entorno.
-// ─────────────────────────────────────────────────────────────────
-
 export interface Order {
   orderId: string;
   fecha: string;
@@ -47,6 +41,42 @@ export interface DashboardData {
   tipoEnvioBreakdown: { tipo: string; count: number; color: string }[];
   medioPagoBreakdown: { medio: string; count: number; revenue: number }[];
   cuotasBreakdown: { cuotas: string; count: number }[];
+  waterfallData: { name: string; value: number; total: number; color: string; isTotal: boolean }[];
+  heatmap: { day: number; hour: number; count: number; revenue: number }[];
+  skuPerformance: {
+    sku: string;
+    name: string;
+    units: number;
+    revenue: number;
+    margen: number;
+    comision: number;
+    envio: number;
+    margenPct: number;
+  }[];
+  currentMonth: {
+    revenue: number;
+    margen: number;
+    comisiones: number;
+    envios: number;
+    orders: number;
+    units: number;
+    margenPct: number;
+    avgMargen: number;
+    avgOrderValue: number;
+  };
+  prevMonth: {
+    revenue: number;
+    margen: number;
+    comisiones: number;
+    envios: number;
+    orders: number;
+    units: number;
+    margenPct: number;
+    avgMargen: number;
+    avgOrderValue: number;
+  };
+  revenueCurrentMonth: { day: number; revenue: number; margen: number; orders: number }[];
+  revenuePrevMonth: { day: number; revenue: number; margen: number; orders: number }[];
 }
 
 const ENVIO_COLORS: Record<string, string> = {
@@ -110,6 +140,18 @@ export async function fetchDashboardData(): Promise<DashboardData> {
   return processData(orders);
 }
 
+function parseHora(horaStr: string): number {
+  // Formato ISO: "1899-12-30T23:26:25.000Z" → extraer hora UTC
+  try {
+    const d = new Date(horaStr);
+    if (!isNaN(d.getTime())) return d.getUTCHours();
+  } catch {}
+  // Formato HH:mm:ss
+  const parts = horaStr.split(":");
+  if (parts.length >= 1) return parseInt(parts[0]) || 0;
+  return 0;
+}
+
 function processData(orders: Order[]): DashboardData {
   const totalRevenue = orders.reduce((s, o) => s + o.totalItem, 0);
   const totalMargen = orders.reduce((s, o) => s + o.margenReal, 0);
@@ -119,7 +161,7 @@ function processData(orders: Order[]): DashboardData {
   const totalEnvios = totalEnviosBruto - totalBonif;
   const totalUnits = orders.reduce((s, o) => s + o.cantidad, 0);
 
-  // Revenue por día
+  // ── Revenue por día ──────────────────────────────────────────
   const dayMap: Record<string, { revenue: number; margen: number; orders: number }> = {};
   orders.forEach((o) => {
     const d = new Date(o.fecha);
@@ -135,7 +177,7 @@ function processData(orders: Order[]): DashboardData {
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([date, v]) => ({ date, ...v }));
 
-  // Revenue por mes
+  // ── Revenue por mes ──────────────────────────────────────────
   const monthMap: Record<string, { revenue: number; margen: number; orders: number }> = {};
   orders.forEach((o) => {
     const d = new Date(o.fecha);
@@ -151,7 +193,7 @@ function processData(orders: Order[]): DashboardData {
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([month, v]) => ({ month, ...v }));
 
-  // Top productos
+  // ── Top productos ────────────────────────────────────────────
   const productMap: Record<string, { sku: string; units: number; revenue: number; margen: number }> = {};
   orders.forEach((o) => {
     const key = o.producto || "Sin título";
@@ -166,7 +208,7 @@ function processData(orders: Order[]): DashboardData {
     .sort((a, b) => b.revenue - a.revenue)
     .slice(0, 10);
 
-  // Tipo de envío
+  // ── Tipo de envío ────────────────────────────────────────────
   const envioMap: Record<string, number> = {};
   orders.forEach((o) => {
     envioMap[o.tipoEnvio] = (envioMap[o.tipoEnvio] || 0) + 1;
@@ -176,7 +218,7 @@ function processData(orders: Order[]): DashboardData {
     .map(([tipo, count]) => ({ tipo, count, color: ENVIO_COLORS[tipo] || "#555577" }))
     .sort((a, b) => b.count - a.count);
 
-  // Medio de pago
+  // ── Medio de pago ────────────────────────────────────────────
   const pagoMap: Record<string, { count: number; revenue: number }> = {};
   orders.forEach((o) => {
     const key = o.medioPago;
@@ -189,7 +231,7 @@ function processData(orders: Order[]): DashboardData {
     .map(([medio, v]) => ({ medio: PAGO_LABELS[medio] || medio, ...v }))
     .sort((a, b) => b.count - a.count);
 
-  // Cuotas
+  // ── Cuotas ───────────────────────────────────────────────────
   const cuotasMap: Record<string, number> = {};
   orders.forEach((o) => {
     const key = o.cuotas === 1 ? "Contado" : `${o.cuotas} cuotas`;
@@ -203,6 +245,170 @@ function processData(orders: Order[]): DashboardData {
       if (b.cuotas === "Contado") return 1;
       return parseInt(a.cuotas) - parseInt(b.cuotas);
     });
+
+  // ── Waterfall: Ingreso → Margen ──────────────────────────────
+  // Recharts waterfall trick: each bar = [start, end]
+  // We use a composed bar with invisible base + colored bar
+  const waterfallData = [
+    {
+      name: "Ingreso bruto",
+      value: totalRevenue,
+      total: totalRevenue,
+      color: "#FFE500",
+      isTotal: false,
+    },
+    {
+      name: "Comisiones ML",
+      value: -totalComisiones,
+      total: totalRevenue - totalComisiones,
+      color: "#FF4466",
+      isTotal: false,
+    },
+    {
+      name: "Costo envíos",
+      value: -totalEnviosBruto,
+      total: totalRevenue - totalComisiones - totalEnviosBruto,
+      color: "#FF6B35",
+      isTotal: false,
+    },
+    {
+      name: "Bonif. envíos",
+      value: totalBonif,
+      total: totalRevenue - totalComisiones - totalEnviosBruto + totalBonif,
+      color: "#44DDAA",
+      isTotal: false,
+    },
+    {
+      name: "Margen real",
+      value: totalMargen,
+      total: totalMargen,
+      color: "#88AAFF",
+      isTotal: true,
+    },
+  ];
+
+  // ── Heatmap día × hora ───────────────────────────────────────
+  // day: 0=Dom, 1=Lun ... 6=Sab | hour: 0-23
+  const heatmapMap: Record<string, { count: number; revenue: number }> = {};
+
+  orders.forEach((o) => {
+    const d = new Date(o.fecha);
+    if (isNaN(d.getTime())) return;
+    const day = d.getUTCDay(); // 0-6
+    const hour = parseHora(o.hora);
+    const key = `${day}-${hour}`;
+    if (!heatmapMap[key]) heatmapMap[key] = { count: 0, revenue: 0 };
+    heatmapMap[key].count += 1;
+    heatmapMap[key].revenue += o.totalItem;
+  });
+
+  const heatmap: { day: number; hour: number; count: number; revenue: number }[] = [];
+  for (let day = 0; day < 7; day++) {
+    for (let hour = 0; hour < 24; hour++) {
+      const key = `${day}-${hour}`;
+      heatmap.push({
+        day,
+        hour,
+        count: heatmapMap[key]?.count || 0,
+        revenue: heatmapMap[key]?.revenue || 0,
+      });
+    }
+  }
+
+  // ── SKU Performance ──────────────────────────────────────────
+  const skuMap: Record<string, {
+    name: string; units: number; revenue: number;
+    margen: number; comision: number; envio: number;
+  }> = {};
+
+  orders.forEach((o) => {
+    const key = o.sku || o.producto?.slice(0, 20) || "SIN SKU";
+    if (!skuMap[key]) {
+      skuMap[key] = { name: o.producto, units: 0, revenue: 0, margen: 0, comision: 0, envio: 0 };
+    }
+    skuMap[key].units += o.cantidad;
+    skuMap[key].revenue += o.totalItem;
+    skuMap[key].margen += o.margenReal;
+    skuMap[key].comision += o.comisionML;
+    skuMap[key].envio += (o.shippingCostSeller - o.bonificacionEnvio);
+  });
+
+  const skuPerformance = Object.entries(skuMap)
+    .map(([sku, v]) => ({
+      sku,
+      ...v,
+      margenPct: v.revenue > 0 ? (v.margen / v.revenue) * 100 : 0,
+    }))
+    .sort((a, b) => b.revenue - a.revenue);
+
+  // ── Mes actual vs mes anterior ──────────────────────────────
+  const now = new Date();
+  const curYear = now.getFullYear();
+  const curMonth = now.getMonth(); // 0-indexed
+  const curDay = now.getDate();
+
+  const prevMonthDate = new Date(curYear, curMonth - 1, 1);
+  const prevYear = prevMonthDate.getFullYear();
+  const prevMonth = prevMonthDate.getMonth();
+
+  const currentMonthOrders = orders.filter((o) => {
+    const d = new Date(o.fecha);
+    return d.getFullYear() === curYear && d.getMonth() === curMonth;
+  });
+
+  // Same day range in previous month (e.g. if today is Feb 27, compare Jan 1-27)
+  const prevMonthOrders = orders.filter((o) => {
+    const d = new Date(o.fecha);
+    return d.getFullYear() === prevYear && d.getMonth() === prevMonth && d.getDate() <= curDay;
+  });
+
+  function calcPeriodSummary(ords: typeof orders) {
+    const rev = ords.reduce((s, o) => s + o.totalItem, 0);
+    const mar = ords.reduce((s, o) => s + o.margenReal, 0);
+    const com = ords.reduce((s, o) => s + o.comisionML, 0);
+    const env = ords.reduce((s, o) => s + o.shippingCostSeller - o.bonificacionEnvio, 0);
+    const uni = ords.reduce((s, o) => s + o.cantidad, 0);
+    return {
+      revenue: rev,
+      margen: mar,
+      comisiones: com,
+      envios: env,
+      orders: ords.length,
+      units: uni,
+      margenPct: rev > 0 ? (mar / rev) * 100 : 0,
+      avgMargen: ords.length > 0 ? mar / ords.length : 0,
+      avgOrderValue: ords.length > 0 ? rev / ords.length : 0,
+    };
+  }
+
+  const currentMonth = calcPeriodSummary(currentMonthOrders);
+  const prevMonth = calcPeriodSummary(prevMonthOrders);
+
+  // Day-by-day for current month and prev month
+  const revenueCurrentMonth: { day: number; revenue: number; margen: number; orders: number }[] = [];
+  const revenuePrevMonth: { day: number; revenue: number; margen: number; orders: number }[] = [];
+
+  // Current month: fill all days 1..curDay
+  for (let d = 1; d <= curDay; d++) {
+    const dayOrders = currentMonthOrders.filter((o) => new Date(o.fecha).getDate() === d);
+    revenueCurrentMonth.push({
+      day: d,
+      revenue: dayOrders.reduce((s, o) => s + o.totalItem, 0),
+      margen: dayOrders.reduce((s, o) => s + o.margenReal, 0),
+      orders: dayOrders.length,
+    });
+  }
+
+  // Prev month: same days 1..curDay
+  for (let d = 1; d <= curDay; d++) {
+    const dayOrders = prevMonthOrders.filter((o) => new Date(o.fecha).getDate() === d);
+    revenuePrevMonth.push({
+      day: d,
+      revenue: dayOrders.reduce((s, o) => s + o.totalItem, 0),
+      margen: dayOrders.reduce((s, o) => s + o.margenReal, 0),
+      orders: dayOrders.length,
+    });
+  }
 
   return {
     orders,
@@ -223,5 +429,12 @@ function processData(orders: Order[]): DashboardData {
     tipoEnvioBreakdown,
     medioPagoBreakdown,
     cuotasBreakdown,
+    waterfallData,
+    heatmap,
+    skuPerformance,
+    currentMonth,
+    prevMonth,
+    revenueCurrentMonth,
+    revenuePrevMonth,
   };
 }

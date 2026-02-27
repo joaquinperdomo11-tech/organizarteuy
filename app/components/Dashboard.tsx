@@ -5,6 +5,9 @@ import StatCard from "./StatCard";
 import RevenueChart from "./RevenueChart";
 import { TopProductsChart, StatusChart } from "./Charts";
 import OrdersTable from "./OrdersTable";
+import WaterfallChart from "./WaterfallChart";
+import SalesHeatmap from "./SalesHeatmap";
+import SkuPerformance from "./SkuPerformance";
 
 function Skeleton({ className }: { className: string }) {
   return <div className={`skeleton ${className}`} />;
@@ -41,7 +44,12 @@ export default function Dashboard() {
     return () => clearInterval(interval);
   }, [fetchData]);
 
-  const { summary } = data || {};
+  const { summary, currentMonth, prevMonth } = data || {};
+
+  function pct(cur?: number, prev?: number) {
+    if (!prev || prev === 0) return undefined;
+    return ((( cur || 0) - prev) / prev) * 100;
+  }
 
   return (
     <div className="min-h-screen">
@@ -95,9 +103,12 @@ export default function Dashboard() {
 
         {/* ── KPIs fila 1: financieros ───────────────────────────── */}
         <section>
-          <p className="text-brand-sub text-xs font-mono uppercase tracking-widest mb-3">
-            Resumen financiero
-          </p>
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-brand-sub text-xs font-mono uppercase tracking-widest">
+              Resumen financiero — Mes actual
+            </p>
+            <p className="text-brand-muted text-xs font-mono">vs mismo período mes anterior</p>
+          </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
             {loading ? (
               Array.from({ length: 5 }).map((_, i) => (
@@ -108,42 +119,47 @@ export default function Dashboard() {
                 <div className="col-span-2 sm:col-span-1">
                   <StatCard
                     label="Ingresos brutos"
-                    value={summary?.totalRevenue || 0}
+                    value={currentMonth?.revenue || 0}
                     prefix="$"
                     accent
                     delay={0}
                     icon="💰"
+                    trend={pct(currentMonth?.revenue, prevMonth?.revenue)}
                   />
                 </div>
                 <StatCard
                   label="Margen real"
-                  value={summary?.totalMargen || 0}
+                  value={currentMonth?.margen || 0}
                   prefix="$"
                   delay={80}
                   icon="📈"
-                  sub={`${summary?.margenPct.toFixed(1)}% del total`}
+                  sub={`${currentMonth?.margenPct.toFixed(1) || 0}% del total`}
+                  trend={pct(currentMonth?.margen, prevMonth?.margen)}
                 />
                 <StatCard
                   label="Comisiones ML"
-                  value={summary?.totalComisiones || 0}
+                  value={currentMonth?.comisiones || 0}
                   prefix="$"
                   delay={160}
                   icon="🏦"
+                  trend={pct(currentMonth?.comisiones, prevMonth?.comisiones)}
                 />
                 <StatCard
                   label="Costo envíos neto"
-                  value={summary?.totalEnvios || 0}
+                  value={currentMonth?.envios || 0}
                   prefix="$"
                   delay={240}
                   icon="📦"
+                  trend={pct(currentMonth?.envios, prevMonth?.envios)}
                 />
                 <StatCard
                   label="Ticket promedio"
-                  value={summary?.avgOrderValue || 0}
+                  value={currentMonth?.avgOrderValue || 0}
                   prefix="$"
                   delay={320}
                   icon="🎯"
-                  sub={`Margen prom. $${summary?.avgMargen.toFixed(0) || 0}`}
+                  sub={`Margen prom. $${currentMonth?.avgMargen.toFixed(0) || 0}`}
+                  trend={pct(currentMonth?.avgOrderValue, prevMonth?.avgOrderValue)}
                 />
               </>
             )}
@@ -152,9 +168,12 @@ export default function Dashboard() {
 
         {/* ── KPIs fila 2: operativos ────────────────────────────── */}
         <section>
-          <p className="text-brand-sub text-xs font-mono uppercase tracking-widest mb-3">
-            Operaciones
-          </p>
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-brand-sub text-xs font-mono uppercase tracking-widest">
+              Operaciones — Mes actual
+            </p>
+            <p className="text-brand-muted text-xs font-mono">vs mismo período mes anterior</p>
+          </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             {loading ? (
               Array.from({ length: 4 }).map((_, i) => (
@@ -162,22 +181,36 @@ export default function Dashboard() {
               ))
             ) : (
               <>
-                <StatCard label="Total órdenes" value={summary?.totalOrders || 0} delay={0} icon="🛒" />
-                <StatCard label="Unidades vendidas" value={summary?.totalUnits || 0} delay={80} icon="📊" />
+                <StatCard
+                  label="Total órdenes"
+                  value={currentMonth?.orders || 0}
+                  delay={0}
+                  icon="🛒"
+                  trend={pct(currentMonth?.orders, prevMonth?.orders)}
+                />
+                <StatCard
+                  label="Unidades vendidas"
+                  value={currentMonth?.units || 0}
+                  delay={80}
+                  icon="📊"
+                  trend={pct(currentMonth?.units, prevMonth?.units)}
+                />
                 <StatCard
                   label="Margen %"
-                  value={summary?.margenPct || 0}
+                  value={currentMonth?.margenPct || 0}
                   suffix="%"
                   decimals={1}
                   delay={160}
                   icon="💹"
+                  trend={pct(currentMonth?.margenPct, prevMonth?.margenPct)}
                 />
                 <StatCard
                   label="Margen por orden"
-                  value={summary?.avgMargen || 0}
+                  value={currentMonth?.avgMargen || 0}
                   prefix="$"
                   delay={240}
                   icon="⚡"
+                  trend={pct(currentMonth?.avgMargen, prevMonth?.avgMargen)}
                 />
               </>
             )}
@@ -192,6 +225,8 @@ export default function Dashboard() {
             <RevenueChart
               byDay={data?.revenueByDay || []}
               byMonth={data?.revenueByMonth || []}
+              currentMonthByDay={data?.revenueCurrentMonth || []}
+              prevMonthByDay={data?.revenuePrevMonth || []}
             />
           )}
         </section>
@@ -223,6 +258,30 @@ export default function Dashboard() {
               <MedioPagoChart data={data?.medioPagoBreakdown || []} />
               <CuotasChart data={data?.cuotasBreakdown || []} />
             </>
+          )}
+        </section>
+
+        {/* ── Waterfall + Heatmap ────────────────────────────────── */}
+        <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {loading ? (
+            <>
+              <Skeleton className="h-80 rounded-2xl" />
+              <Skeleton className="h-80 rounded-2xl" />
+            </>
+          ) : (
+            <>
+              <WaterfallChart data={data?.waterfallData || []} />
+              <SalesHeatmap data={data?.heatmap || []} />
+            </>
+          )}
+        </section>
+
+        {/* ── SKU Performance ────────────────────────────────────── */}
+        <section>
+          {loading ? (
+            <Skeleton className="h-96 rounded-2xl" />
+          ) : (
+            <SkuPerformance data={data?.skuPerformance || []} />
           )}
         </section>
 
