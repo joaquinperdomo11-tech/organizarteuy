@@ -13,6 +13,7 @@ interface StatCardProps {
   delay?: number;
   icon?: string;
   trend?: number; // percentage change
+  invertTrend?: boolean; // if true, down = good (green), up = bad (red)
 }
 
 function useCountUp(target: number, duration = 1200, delay = 0) {
@@ -52,6 +53,7 @@ export default function StatCard({
   delay = 0,
   icon,
   trend,
+  invertTrend = false,
 }: StatCardProps) {
   const animated = useCountUp(value, 1000, delay);
 
@@ -114,9 +116,13 @@ export default function StatCard({
           <div
             className={clsx(
               "inline-flex items-center gap-1 mt-3 px-2 py-0.5 rounded-full text-xs font-mono",
-              trend >= 0
-                ? "bg-green-500/10 text-green-400"
-                : "bg-red-500/10 text-red-400"
+              invertTrend
+                ? trend <= 0
+                  ? "bg-green-500/10 text-green-400"
+                  : "bg-red-500/10 text-red-400"
+                : trend >= 0
+                  ? "bg-green-500/10 text-green-400"
+                  : "bg-red-500/10 text-red-400"
             )}
           >
             <span>{trend >= 0 ? "▲" : "▼"}</span>

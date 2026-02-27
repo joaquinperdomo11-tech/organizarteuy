@@ -52,7 +52,9 @@ function formatMonthLabel(m: string) {
 
 export function TopProductsChart({ products, allOrders }: TopProductsProps) {
   const availableMonths = useMemo(() => getAvailableMonths(allOrders), [allOrders]);
-  const [selectedMonths, setSelectedMonths] = useState<string[]>([]); // empty = all time
+  const now = new Date();
+  const defaultMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const [selectedMonths, setSelectedMonths] = useState<string[]>([defaultMonth]); // default = current month
   const [metric, setMetric] = useState<"revenue" | "units">("revenue");
   const [showMonthPicker, setShowMonthPicker] = useState(false);
 
@@ -63,35 +65,37 @@ export function TopProductsChart({ products, allOrders }: TopProductsProps) {
   };
 
   const filteredData = useMemo(() => {
-    if (selectedMonths.length === 0) return products;
-
-    // Recalculate from raw orders filtered by selected months
-    const map: Record<string, { sku: string; units: number; revenue: number; margen: number }> = {};
+    // Always recalculate from raw orders, grouped by SKU
+    const map: Record<string, { name: string; units: number; revenue: number; margen: number }> = {};
     allOrders.forEach((o) => {
-      const d = new Date(o.fecha);
-      if (isNaN(d.getTime())) return;
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-      if (!selectedMonths.includes(key)) return;
-      const name = o.producto || "Sin título";
-      if (!map[name]) map[name] = { sku: o.sku, units: 0, revenue: 0, margen: 0 };
-      map[name].units += o.cantidad;
-      map[name].revenue += o.totalItem;
-      map[name].margen += o.margenReal;
+      if (selectedMonths.length > 0) {
+        const d = new Date(o.fecha);
+        if (isNaN(d.getTime())) return;
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+        if (!selectedMonths.includes(key)) return;
+      }
+      const sku = o.sku || o.producto?.slice(0, 20) || "SIN SKU";
+      if (!map[sku]) map[sku] = { name: o.producto || sku, units: 0, revenue: 0, margen: 0 };
+      map[sku].units += o.cantidad;
+      map[sku].revenue += o.totalItem;
+      map[sku].margen += o.margenReal;
     });
 
     return Object.entries(map)
-      .map(([name, v]) => ({ name, ...v }))
+      .map(([sku, v]) => ({ sku, name: v.name, units: v.units, revenue: v.revenue, margen: v.margen }))
       .sort((a, b) => b[metric] - a[metric])
       .slice(0, 8);
-  }, [selectedMonths, allOrders, products, metric]);
+  }, [selectedMonths, allOrders, metric]);
 
-  const data = filteredData
+  // Sort descending (largest at top for vertical bar)
+  const data = [...filteredData]
+    .sort((a, b) => b[metric] - a[metric])
     .slice(0, 8)
-    .map((p) => ({ ...p, shortName: truncate(p.name) }))
-    .sort((a, b) => a[metric] - b[metric]); // ascending for horizontal chart
+    .map((p) => ({ ...p, shortName: `${p.sku ? p.sku + " · " : ""}${truncate(p.name, 18)}` }))
+    .reverse(); // reverse so largest is at top in horizontal chart
 
   const filterLabel = selectedMonths.length === 0
-    ? "Histórico"
+    ? "Histórico completo"
     : selectedMonths.length === 1
     ? formatMonthLabel(selectedMonths[0])
     : `${selectedMonths.length} meses`;

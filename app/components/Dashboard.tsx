@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import type { DashboardData } from "@/lib/sheets";
 import StatCard from "./StatCard";
 import RevenueChart from "./RevenueChart";
@@ -125,32 +125,36 @@ export default function Dashboard() {
                     delay={0}
                     icon="💰"
                     trend={pct(currentMonth?.revenue, prevMonth?.revenue)}
+                    invertTrend={false}
                   />
                 </div>
                 <StatCard
-                  label="Margen real"
-                  value={currentMonth?.margen || 0}
-                  prefix="$"
-                  delay={80}
-                  icon="📈"
-                  sub={`${currentMonth?.margenPct.toFixed(1) || 0}% del total`}
-                  trend={pct(currentMonth?.margen, prevMonth?.margen)}
-                />
-                <StatCard
-                  label="Comisiones ML"
+                  label="Comisiones MELI"
                   value={currentMonth?.comisiones || 0}
                   prefix="$"
-                  delay={160}
+                  delay={80}
                   icon="🏦"
                   trend={pct(currentMonth?.comisiones, prevMonth?.comisiones)}
+                  invertTrend={true}
                 />
                 <StatCard
                   label="Costo envíos neto"
                   value={currentMonth?.envios || 0}
                   prefix="$"
-                  delay={240}
+                  delay={160}
                   icon="📦"
                   trend={pct(currentMonth?.envios, prevMonth?.envios)}
+                  invertTrend={true}
+                />
+                <StatCard
+                  label="Margen real"
+                  value={currentMonth?.margen || 0}
+                  prefix="$"
+                  delay={240}
+                  icon="📈"
+                  sub={`${currentMonth?.margenPct.toFixed(1) || 0}% del total`}
+                  trend={pct(currentMonth?.margen, prevMonth?.margen)}
+                  invertTrend={false}
                 />
                 <StatCard
                   label="Ticket promedio"
@@ -160,6 +164,7 @@ export default function Dashboard() {
                   icon="🎯"
                   sub={`Margen prom. $${currentMonth?.avgMargen.toFixed(0) || 0}`}
                   trend={pct(currentMonth?.avgOrderValue, prevMonth?.avgOrderValue)}
+                  invertTrend={false}
                 />
               </>
             )}
@@ -255,8 +260,8 @@ export default function Dashboard() {
             </>
           ) : (
             <>
-              <MedioPagoChart data={data?.medioPagoBreakdown || []} />
-              <CuotasChart data={data?.cuotasBreakdown || []} />
+              <MedioPagoChart allOrders={data?.orders || []} />
+              <CuotasChart allOrders={data?.orders || []} />
             </>
           )}
         </section>
@@ -310,24 +315,97 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, LabelList,
 } from "recharts";
 
-function MedioPagoChart({ data }: { data: { medio: string; count: number; revenue: number }[] }) {
-  const colors = ["#FFE500", "#FF6B35", "#88AAFF", "#AA88FF", "#44DDAA", "#FF4466", "#88CCFF"];
-  const sorted = [...data].sort((a, b) => a.count - b.count);
+const PAGO_LABELS: Record<string, string> = {
+  account_money: "Cuenta ML", visa: "Visa", master: "Mastercard",
+  oca: "OCA", debvisa: "Déb. Visa", debmaster: "Déb. Master",
+  abitab: "Abitab", redpagos: "Redpagos", amex: "Amex",
+};
+
+function getMonthKey(fecha: string) {
+  const d = new Date(fecha);
+  if (isNaN(d.getTime())) return "";
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+function fmtMonth(m: string) {
+  const [y, mo] = m.split("-");
+  return ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"][parseInt(mo)-1] + " " + y.slice(2);
+}
+function curMonth() {
+  const n = new Date();
+  return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,"0")}`;
+}
+
+function MedioPagoChart({ allOrders }: { allOrders: { fecha: string; medioPago: string; totalItem: number }[] }) {
+  const colors = ["#FFE500", "#88AAFF", "#FF6B35", "#44DDAA", "#AA88FF", "#FF4466", "#88CCFF"];
+  const [selectedMonth, setSelectedMonth] = useState<string>(curMonth());
+  const [showPicker, setShowPicker] = useState(false);
+
+  const availableMonths = useMemo(() => {
+    const s = new Set<string>();
+    allOrders.forEach(o => { const k = getMonthKey(o.fecha); if (k) s.add(k); });
+    return Array.from(s).sort().reverse();
+  }, [allOrders]);
+
+  const filtered = useMemo(() => {
+    if (selectedMonth === "all") return allOrders;
+    return allOrders.filter(o => getMonthKey(o.fecha) === selectedMonth);
+  }, [allOrders, selectedMonth]);
+
+  const chartData = useMemo(() => {
+    const map: Record<string, { count: number; revenue: number }> = {};
+    filtered.forEach(o => {
+      const k = PAGO_LABELS[o.medioPago] || o.medioPago || "Otro";
+      if (!map[k]) map[k] = { count: 0, revenue: 0 };
+      map[k].count += 1;
+      map[k].revenue += o.totalItem;
+    });
+    const entries = Object.entries(map).map(([medio, v]) => ({ medio, ...v })).sort((a,b) => b.count - a.count);
+    const MIN_PCT = 0.04;
+    const total = entries.reduce((s,e) => s + e.count, 0);
+    const main: typeof entries = [];
+    let otroCount = 0, otroRev = 0;
+    entries.forEach(e => {
+      if (e.count / total >= MIN_PCT) main.push(e);
+      else { otroCount += e.count; otroRev += e.revenue; }
+    });
+    if (otroCount > 0) main.push({ medio: "Otros", count: otroCount, revenue: otroRev });
+    return main.sort((a,b) => a.count - b.count);
+  }, [filtered]);
+
+  const filterLabel = selectedMonth === "all" ? "Histórico" : availableMonths.includes(selectedMonth) ? fmtMonth(selectedMonth) : "Mes actual";
+
   return (
     <div className="bg-brand-card border border-brand-border rounded-2xl p-6">
-      <h3 className="font-display font-semibold text-brand-text text-lg mb-1">Medios de Pago</h3>
-      <p className="text-brand-sub text-sm mb-5">Cantidad de órdenes por método</p>
-      <ResponsiveContainer width="100%" height={220}>
-        <BarChart data={sorted} layout="vertical" margin={{ top: 0, right: 55, left: 0, bottom: 0 }}>
+      <div className="flex items-start justify-between mb-4 flex-wrap gap-2">
+        <div>
+          <h3 className="font-display font-semibold text-brand-text text-lg mb-0.5">Medios de Pago</h3>
+          <p className="text-brand-sub text-sm">Órdenes por método</p>
+        </div>
+        <div className="relative">
+          <button onClick={() => setShowPicker(!showPicker)} className="px-3 py-1.5 text-xs font-mono border border-brand-border rounded-lg text-brand-sub hover:text-brand-text transition-all">
+            📅 {filterLabel}
+          </button>
+          {showPicker && (
+            <div className="absolute right-0 top-9 z-20 bg-brand-card border border-brand-border rounded-xl shadow-xl p-3 min-w-[150px]">
+              <button onClick={() => { setSelectedMonth(curMonth()); setShowPicker(false); }} className={`w-full text-left px-2 py-1.5 text-xs font-mono rounded-lg mb-1 ${selectedMonth === curMonth() ? "bg-brand-yellow/10 text-brand-yellow" : "text-brand-sub hover:text-brand-text"}`}>Mes actual</button>
+              <button onClick={() => { setSelectedMonth("all"); setShowPicker(false); }} className={`w-full text-left px-2 py-1.5 text-xs font-mono rounded-lg mb-1 ${selectedMonth === "all" ? "bg-brand-yellow/10 text-brand-yellow" : "text-brand-sub hover:text-brand-text"}`}>Histórico</button>
+              <div className="border-t border-brand-border my-1" />
+              <div className="max-h-44 overflow-y-auto space-y-0.5">
+                {availableMonths.map(m => (
+                  <button key={m} onClick={() => { setSelectedMonth(m); setShowPicker(false); }} className={`w-full text-left px-2 py-1.5 text-xs font-mono rounded-lg ${selectedMonth === m ? "bg-brand-yellow/10 text-brand-yellow" : "text-brand-sub hover:text-brand-text"}`}>{fmtMonth(m)}</button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+      <ResponsiveContainer width="100%" height={Math.max(180, chartData.length * 38)}>
+        <BarChart data={chartData} layout="vertical" margin={{ top: 0, right: 50, left: 0, bottom: 0 }}>
           <XAxis type="number" tick={false} axisLine={false} tickLine={false} />
-          <YAxis type="category" dataKey="medio" width={110} tick={{ fill: "#E8E8F0", fontSize: 11, fontFamily: "DM Sans" }} axisLine={false} tickLine={false} />
-          <Tooltip
-            formatter={(v: number) => [`${v} órdenes`, "Órdenes"]}
-            contentStyle={{ background: "#0A0A0F", border: "1px solid #1E1E2E", borderRadius: "10px", fontFamily: "DM Sans", color: "#E8E8F0" }}
-            cursor={{ fill: "rgba(255,229,0,0.04)" }}
-          />
+          <YAxis type="category" dataKey="medio" width={115} tick={{ fill: "#E8E8F0", fontSize: 11, fontFamily: "DM Sans" }} axisLine={false} tickLine={false} />
+          <Tooltip formatter={(v: number) => [`${v} órdenes`, "Órdenes"]} contentStyle={{ background: "#0A0A0F", border: "1px solid #1E1E2E", borderRadius: "10px", fontFamily: "DM Sans", color: "#E8E8F0" }} cursor={{ fill: "rgba(255,229,0,0.04)" }} />
           <Bar dataKey="count" radius={[0, 4, 4, 0]}>
-            {sorted.map((_, i) => <Cell key={i} fill={colors[i % colors.length]} />)}
+            {chartData.map((_, i) => <Cell key={i} fill={colors[i % colors.length]} />)}
             <LabelList dataKey="count" position="right" formatter={(v: number) => `${v}`} style={{ fill: "#8888AA", fontSize: 10, fontFamily: "DM Mono" }} />
           </Bar>
         </BarChart>
@@ -336,23 +414,68 @@ function MedioPagoChart({ data }: { data: { medio: string; count: number; revenu
   );
 }
 
-function CuotasChart({ data }: { data: { cuotas: string; count: number }[] }) {
+function CuotasChart({ allOrders }: { allOrders: { fecha: string; cuotas: number }[] }) {
   const colors = ["#FFE500", "#FF6B35", "#88AAFF", "#AA88FF", "#44DDAA", "#FF4466", "#FFB347", "#88CCFF"];
+  const [selectedMonth, setSelectedMonth] = useState<string>(curMonth());
+  const [showPicker, setShowPicker] = useState(false);
+
+  const availableMonths = useMemo(() => {
+    const s = new Set<string>();
+    allOrders.forEach(o => { const k = getMonthKey(o.fecha); if (k) s.add(k); });
+    return Array.from(s).sort().reverse();
+  }, [allOrders]);
+
+  const chartData = useMemo(() => {
+    const filtered = selectedMonth === "all" ? allOrders : allOrders.filter(o => getMonthKey(o.fecha) === selectedMonth);
+    const map: Record<string, number> = {};
+    filtered.forEach(o => {
+      const k = o.cuotas === 1 ? "Contado" : `${o.cuotas}c`;
+      map[k] = (map[k] || 0) + 1;
+    });
+    return Object.entries(map)
+      .map(([cuotas, count]) => ({ cuotas, count }))
+      .sort((a, b) => {
+        if (a.cuotas === "Contado") return -1;
+        if (b.cuotas === "Contado") return 1;
+        return parseInt(a.cuotas) - parseInt(b.cuotas);
+      });
+  }, [allOrders, selectedMonth]);
+
+  const filterLabel = selectedMonth === "all" ? "Histórico" : availableMonths.includes(selectedMonth) ? fmtMonth(selectedMonth) : "Mes actual";
+
   return (
     <div className="bg-brand-card border border-brand-border rounded-2xl p-6">
-      <h3 className="font-display font-semibold text-brand-text text-lg mb-1">Cuotas</h3>
-      <p className="text-brand-sub text-sm mb-5">Distribución de financiamiento</p>
+      <div className="flex items-start justify-between mb-4 flex-wrap gap-2">
+        <div>
+          <h3 className="font-display font-semibold text-brand-text text-lg mb-0.5">Cuotas</h3>
+          <p className="text-brand-sub text-sm">Distribución de financiamiento</p>
+        </div>
+        <div className="relative">
+          <button onClick={() => setShowPicker(!showPicker)} className="px-3 py-1.5 text-xs font-mono border border-brand-border rounded-lg text-brand-sub hover:text-brand-text transition-all">
+            📅 {filterLabel}
+          </button>
+          {showPicker && (
+            <div className="absolute right-0 top-9 z-20 bg-brand-card border border-brand-border rounded-xl shadow-xl p-3 min-w-[150px]">
+              <button onClick={() => { setSelectedMonth(curMonth()); setShowPicker(false); }} className={`w-full text-left px-2 py-1.5 text-xs font-mono rounded-lg mb-1 ${selectedMonth === curMonth() ? "bg-brand-yellow/10 text-brand-yellow" : "text-brand-sub hover:text-brand-text"}`}>Mes actual</button>
+              <button onClick={() => { setSelectedMonth("all"); setShowPicker(false); }} className={`w-full text-left px-2 py-1.5 text-xs font-mono rounded-lg mb-1 ${selectedMonth === "all" ? "bg-brand-yellow/10 text-brand-yellow" : "text-brand-sub hover:text-brand-text"}`}>Histórico</button>
+              <div className="border-t border-brand-border my-1" />
+              <div className="max-h-44 overflow-y-auto space-y-0.5">
+                {availableMonths.map(m => (
+                  <button key={m} onClick={() => { setSelectedMonth(m); setShowPicker(false); }} className={`w-full text-left px-2 py-1.5 text-xs font-mono rounded-lg ${selectedMonth === m ? "bg-brand-yellow/10 text-brand-yellow" : "text-brand-sub hover:text-brand-text"}`}>{fmtMonth(m)}</button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
       <ResponsiveContainer width="100%" height={220}>
-        <BarChart data={data} margin={{ top: 0, right: 10, left: -10, bottom: 0 }}>
+        <BarChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
           <XAxis dataKey="cuotas" tick={{ fill: "#8888AA", fontSize: 10, fontFamily: "DM Mono" }} axisLine={false} tickLine={false} />
           <YAxis tick={{ fill: "#8888AA", fontSize: 10, fontFamily: "DM Mono" }} axisLine={false} tickLine={false} />
-          <Tooltip
-            formatter={(v: number) => [`${v} órdenes`, "Órdenes"]}
-            contentStyle={{ background: "#0A0A0F", border: "1px solid #1E1E2E", borderRadius: "10px", fontFamily: "DM Sans", color: "#E8E8F0" }}
-            cursor={{ fill: "rgba(255,229,0,0.04)" }}
-          />
+          <Tooltip formatter={(v: number) => [`${v} órdenes`, "Órdenes"]} contentStyle={{ background: "#0A0A0F", border: "1px solid #1E1E2E", borderRadius: "10px", fontFamily: "DM Sans", color: "#E8E8F0" }} cursor={{ fill: "rgba(255,229,0,0.04)" }} />
           <Bar dataKey="count" radius={[4, 4, 0, 0]}>
-            {data.map((_, i) => <Cell key={i} fill={colors[i % colors.length]} />)}
+            {chartData.map((_, i) => <Cell key={i} fill={colors[i % colors.length]} />)}
+            <LabelList dataKey="count" position="top" formatter={(v: number) => `${v}`} style={{ fill: "#8888AA", fontSize: 10, fontFamily: "DM Mono" }} />
           </Bar>
         </BarChart>
       </ResponsiveContainer>
