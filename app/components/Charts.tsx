@@ -17,7 +17,7 @@ interface TopProductsProps {
 }
 
 interface StatusChartProps {
-  data: { status: string; count: number; color: string }[];
+  data: { tipo: string; count: number; color: string }[];
 }
 
 function formatCurrency(value: number) {
@@ -29,18 +29,6 @@ function formatCurrency(value: number) {
 function truncate(str: string, n = 25) {
   return str.length > n ? str.slice(0, n) + "…" : str;
 }
-
-const StatusLabel: Record<string, string> = {
-  paid: "Pagado",
-  payment_done: "Pagado",
-  approved: "Aprobado",
-  pagado: "Pagado",
-  pending: "Pendiente",
-  cancelled: "Cancelado",
-  cancelado: "Cancelado",
-  refunded: "Reembolsado",
-  in_process: "En proceso",
-};
 
 export function TopProductsChart({ products }: TopProductsProps) {
   const data = products
@@ -126,7 +114,7 @@ const renderCustomLabel = ({
 
 export function StatusChart({ data }: StatusChartProps) {
   const pieData = data.map((d) => ({
-    name: StatusLabel[d.status] || d.status,
+    name: StatusLabel[d.status] || d.tipo,
     value: d.count,
     color: d.color,
   }));
@@ -136,7 +124,7 @@ export function StatusChart({ data }: StatusChartProps) {
       <h3 className="font-display font-semibold text-brand-text text-lg mb-1">
         Estado de Órdenes
       </h3>
-      <p className="text-brand-sub text-sm mb-4">Distribución por estado</p>
+      <p className="text-brand-sub text-sm mb-4">Distribución por tipo de envio</p>
 
       <ResponsiveContainer width="100%" height={260}>
         <PieChart>
