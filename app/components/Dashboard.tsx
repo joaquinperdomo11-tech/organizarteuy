@@ -240,7 +240,7 @@ export default function Dashboard() {
             </>
           ) : (
             <>
-              <TopProductsChart products={data?.topProducts || []} />
+              <TopProductsChart products={data?.topProducts || []} allOrders={data?.orders || []} />
               <StatusChart data={data?.tipoEnvioBreakdown || []} />
             </>
           )}
@@ -270,8 +270,8 @@ export default function Dashboard() {
             </>
           ) : (
             <>
-              <WaterfallChart data={data?.waterfallData || []} />
-              <SalesHeatmap data={data?.heatmap || []} />
+              <WaterfallChart allOrders={data?.orders || []} />
+              <SalesHeatmap allOrders={data?.orders || []} />
             </>
           )}
         </section>
@@ -307,26 +307,28 @@ export default function Dashboard() {
 // ── Inline mini-charts ──────────────────────────────────────────
 
 import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, LabelList,
 } from "recharts";
 
 function MedioPagoChart({ data }: { data: { medio: string; count: number; revenue: number }[] }) {
   const colors = ["#FFE500", "#FF6B35", "#88AAFF", "#AA88FF", "#44DDAA", "#FF4466", "#88CCFF"];
+  const sorted = [...data].sort((a, b) => a.count - b.count);
   return (
     <div className="bg-brand-card border border-brand-border rounded-2xl p-6">
       <h3 className="font-display font-semibold text-brand-text text-lg mb-1">Medios de Pago</h3>
       <p className="text-brand-sub text-sm mb-5">Cantidad de órdenes por método</p>
       <ResponsiveContainer width="100%" height={220}>
-        <BarChart data={data} layout="vertical" margin={{ top: 0, right: 50, left: 0, bottom: 0 }}>
-          <XAxis type="number" tick={{ fill: "#8888AA", fontSize: 10, fontFamily: "DM Mono" }} axisLine={false} tickLine={false} />
-          <YAxis type="category" dataKey="medio" width={100} tick={{ fill: "#E8E8F0", fontSize: 11, fontFamily: "DM Sans" }} axisLine={false} tickLine={false} />
+        <BarChart data={sorted} layout="vertical" margin={{ top: 0, right: 55, left: 0, bottom: 0 }}>
+          <XAxis type="number" tick={false} axisLine={false} tickLine={false} />
+          <YAxis type="category" dataKey="medio" width={110} tick={{ fill: "#E8E8F0", fontSize: 11, fontFamily: "DM Sans" }} axisLine={false} tickLine={false} />
           <Tooltip
-            formatter={(v: number, name: string) => [name === "count" ? `${v} órdenes` : `$${v.toFixed(0)}`, name === "count" ? "Órdenes" : "Ingresos"]}
+            formatter={(v: number) => [`${v} órdenes`, "Órdenes"]}
             contentStyle={{ background: "#0A0A0F", border: "1px solid #1E1E2E", borderRadius: "10px", fontFamily: "DM Sans", color: "#E8E8F0" }}
             cursor={{ fill: "rgba(255,229,0,0.04)" }}
           />
           <Bar dataKey="count" radius={[0, 4, 4, 0]}>
-            {data.map((_, i) => <Cell key={i} fill={colors[i % colors.length]} />)}
+            {sorted.map((_, i) => <Cell key={i} fill={colors[i % colors.length]} />)}
+            <LabelList dataKey="count" position="right" formatter={(v: number) => `${v}`} style={{ fill: "#8888AA", fontSize: 10, fontFamily: "DM Mono" }} />
           </Bar>
         </BarChart>
       </ResponsiveContainer>
