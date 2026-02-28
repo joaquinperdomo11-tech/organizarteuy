@@ -456,7 +456,7 @@ function processData(orders: Order[], stock: StockItem[] = []): DashboardData {
     heatmap,
     skuPerformance,
     currentMonth,
-    prevMonth,
+    prevMonth: prevMonthData,
     revenueCurrentMonth,
     revenuePrevMonth,
   };
