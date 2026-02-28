@@ -9,6 +9,7 @@ export interface Order {
   totalItem: number;
   comisionML: number;
   netoSinEnvio: number;
+  itemIdML: string;
   logisticMode: string;
   logisticType: string;
   tipoEnvio: string;
@@ -20,6 +21,18 @@ export interface Order {
   cuotas: number;
   estado: string;
   buyer: string;
+  estadoEnvio: string;
+  ciudadEntrega: string;
+  departamentoEntrega: string;
+}
+
+export interface StockItem {
+  "Item ID ML": string;
+  "SKU": string;
+  "Título": string;
+  "Stock Disponible": number;
+  "Precio": number;
+  "Estado": string;
 }
 
 export interface DashboardData {
@@ -77,6 +90,7 @@ export interface DashboardData {
   };
   revenueCurrentMonth: { day: number; revenue: number; margen: number; orders: number }[];
   revenuePrevMonth: { day: number; revenue: number; margen: number; orders: number }[];
+  stock: StockItem[];
 }
 
 const ENVIO_COLORS: Record<string, string> = {
@@ -110,10 +124,15 @@ export async function fetchDashboardData(): Promise<DashboardData> {
   });
   if (!res.ok) throw new Error(`Error al llamar al Apps Script: ${res.status} ${res.statusText}`);
 
-  const raw: Record<string, unknown>[] = await res.json();
-  if (!Array.isArray(raw)) throw new Error("El Apps Script no devolvió un array JSON válido.");
+  const json = await res.json();
+  
+  // Handle both old format (array) and new format ({orders, stock})
+  const rawOrders: Record<string, unknown>[] = Array.isArray(json) ? json : (json.orders || []);
+  const rawStock: StockItem[] = Array.isArray(json) ? [] : (json.stock || []);
 
-  const orders: Order[] = raw.map((r) => ({
+  if (!Array.isArray(rawOrders)) throw new Error("El Apps Script no devolvió un array JSON válido.");
+
+  const orders: Order[] = rawOrders.map((r) => ({
     orderId: String(r["Order ID"] ?? ""),
     fecha: String(r["Fecha"] ?? ""),
     hora: String(r["Hora"] ?? ""),
@@ -124,6 +143,7 @@ export async function fetchDashboardData(): Promise<DashboardData> {
     totalItem: Number(r["Total Item"]) || 0,
     comisionML: Number(r["Comisión Total ML"]) || 0,
     netoSinEnvio: Number(r["Neto Sin Envío"]) || 0,
+    itemIdML: String(r["Item ID ML"] ?? ""),
     logisticMode: String(r["Logistic Mode"] ?? ""),
     logisticType: String(r["Logistic Type (API)"] ?? ""),
     tipoEnvio: String(r["Tipo Envío (Clasificado)"] ?? "SIN ENVÍO"),
@@ -135,9 +155,12 @@ export async function fetchDashboardData(): Promise<DashboardData> {
     cuotas: Number(r["Cuotas"]) || 1,
     estado: String(r["Estado"] ?? ""),
     buyer: String(r["Buyer"] ?? ""),
+    estadoEnvio: String(r["Estado Envío"] ?? ""),
+    ciudadEntrega: String(r["Ciudad Entrega"] ?? ""),
+    departamentoEntrega: String(r["Departamento Entrega"] ?? ""),
   }));
 
-  return processData(orders);
+  return processData(orders, rawStock);
 }
 
 function parseHora(horaStr: string): number {
@@ -152,7 +175,7 @@ function parseHora(horaStr: string): number {
   return 0;
 }
 
-function processData(orders: Order[]): DashboardData {
+function processData(orders: Order[], stock: StockItem[] = []): DashboardData {
   const totalRevenue = orders.reduce((s, o) => s + o.totalItem, 0);
   const totalMargen = orders.reduce((s, o) => s + o.margenReal, 0);
   const totalComisiones = orders.reduce((s, o) => s + o.comisionML, 0);
@@ -381,8 +404,8 @@ function processData(orders: Order[]): DashboardData {
     };
   }
 
- const currentMonth = calcPeriodSummary(currentMonthOrders);
-  const prevMonthData = calcPeriodSummary(prevMonthOrders);
+  const currentMonth = calcPeriodSummary(currentMonthOrders);
+  const prevMonth = calcPeriodSummary(prevMonthOrders);
 
   // Day-by-day for current month and prev month
   const revenueCurrentMonth: { day: number; revenue: number; margen: number; orders: number }[] = [];
@@ -433,7 +456,7 @@ function processData(orders: Order[]): DashboardData {
     heatmap,
     skuPerformance,
     currentMonth,
-    prevMonth: prevMonthData,
+    prevMonth,
     revenueCurrentMonth,
     revenuePrevMonth,
   };
