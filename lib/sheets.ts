@@ -459,5 +459,6 @@ function processData(orders: Order[], stock: StockItem[] = []): DashboardData {
     prevMonth: prevMonthData,
     revenueCurrentMonth,
     revenuePrevMonth,
+    stock,
   };
 }
