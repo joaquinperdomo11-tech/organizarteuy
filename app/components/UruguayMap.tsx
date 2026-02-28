@@ -1,5 +1,6 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
+import { URUGUAY_GEOJSON } from "@/lib/uruguay-geojson";
 
 interface UruguayMapProps {
   orders: {
@@ -26,65 +27,77 @@ function normalizeDept(raw: string): string {
   return DEPT_NORMALIZE[raw.toLowerCase().trim()] || raw;
 }
 
-// SVG paths para cada departamento de Uruguay (coordenadas en viewBox 0 0 500 600)
-const DEPT_PATHS: Record<string, string> = {
-  "Artigas":        "M 95,20 L 175,20 L 185,55 L 170,80 L 130,90 L 90,75 L 80,45 Z",
-  "Salto":          "M 80,45 L 130,90 L 135,130 L 115,155 L 70,150 L 55,110 L 65,75 Z",
-  "Rivera":         "M 175,20 L 260,25 L 270,70 L 240,95 L 185,90 L 170,80 L 185,55 Z",
-  "Tacuarembó":     "M 185,90 L 240,95 L 255,140 L 230,175 L 185,170 L 160,145 L 135,130 L 170,95 Z",
-  "Paysandú":       "M 55,110 L 115,155 L 120,195 L 95,225 L 55,220 L 40,175 L 45,140 Z",
-  "Cerro Largo":    "M 255,140 L 320,145 L 330,185 L 300,215 L 255,210 L 230,175 Z",
-  "Río Negro":      "M 40,175 L 95,225 L 100,260 L 75,280 L 40,270 L 25,235 L 30,200 Z",
-  "Durazno":        "M 135,130 L 160,145 L 185,170 L 190,210 L 165,240 L 130,235 L 110,205 L 120,170 Z",
-  "Soriano":        "M 25,235 L 75,280 L 80,315 L 55,335 L 25,325 L 15,290 Z",
-  "Florida":        "M 165,240 L 190,210 L 230,215 L 245,250 L 225,285 L 195,295 L 170,275 Z",
-  "Flores":         "M 80,315 L 130,235 L 165,240 L 170,275 L 145,305 L 110,315 Z",
-  "Treinta y Tres": "M 255,210 L 300,215 L 320,255 L 300,290 L 265,295 L 245,270 L 245,250 Z",
-  "Colonia":        "M 15,290 L 55,335 L 60,370 L 35,385 L 10,365 L 8,330 Z",
-  "San José":       "M 60,370 L 110,315 L 145,305 L 150,340 L 130,370 L 95,385 L 70,390 Z",
-  "Lavalleja":      "M 245,250 L 265,295 L 255,330 L 225,345 L 200,325 L 195,295 L 225,285 Z",
-  "Rocha":          "M 300,290 L 350,295 L 375,335 L 355,375 L 310,385 L 280,355 L 265,320 L 255,330 L 265,295 Z",
-  "Canelones":      "M 150,340 L 195,295 L 200,325 L 220,350 L 210,380 L 185,395 L 160,390 L 140,370 Z",
-  "Maldonado":      "M 225,345 L 255,330 L 265,320 L 280,355 L 270,390 L 240,400 L 215,385 L 210,365 Z",
-  "Montevideo":     "M 140,370 L 160,390 L 185,395 L 190,415 L 165,420 L 140,405 Z",
-};
-
-// Centroides para labels
-const DEPT_CENTROIDS: Record<string, [number, number]> = {
-  "Artigas": [130, 52], "Salto": [95, 108], "Rivera": [220, 58],
-  "Tacuarembó": [200, 135], "Paysandú": [78, 185], "Cerro Largo": [282, 178],
-  "Río Negro": [58, 228], "Durazno": [155, 200], "Soriano": [48, 285],
-  "Florida": [200, 255], "Flores": [125, 280], "Treinta y Tres": [278, 252],
-  "Colonia": [32, 340], "San José": [103, 355], "Lavalleja": [228, 310],
-  "Rocha": [318, 340], "Canelones": [182, 350], "Maldonado": [248, 370],
-  "Montevideo": [160, 395],
-};
-
-const DEPT_ABBR: Record<string, string> = {
-  "Artigas": "ART", "Salto": "SAL", "Rivera": "RIV", "Tacuarembó": "TAC",
-  "Paysandú": "PAY", "Cerro Largo": "CLA", "Río Negro": "RNE", "Durazno": "DUR",
-  "Soriano": "SOR", "Florida": "FLA", "Flores": "FLO", "Treinta y Tres": "TYT",
-  "Colonia": "COL", "San José": "SJO", "Lavalleja": "LAV", "Rocha": "ROC",
-  "Canelones": "CAN", "Maldonado": "MAL", "Montevideo": "MVD",
-};
-
 function getHeatColor(intensity: number): string {
-  if (intensity === 0) return "#2A2A3E";
-  if (intensity < 0.15) return "#1a3a5c";
-  if (intensity < 0.30) return "#1e5f8a";
-  if (intensity < 0.50) return "#2b8fbd";
-  if (intensity < 0.70) return "#f0a500";
-  if (intensity < 0.85) return "#f5c518";
+  if (intensity === 0) return "#1C1C2E";
+  if (intensity < 0.15) return "#162844";
+  if (intensity < 0.30) return "#1a4470";
+  if (intensity < 0.50) return "#1a6fa8";
+  if (intensity < 0.70) return "#d48800";
+  if (intensity < 0.85) return "#f0b000";
   return "#FFE500";
 }
 
 function getTextColor(intensity: number): string {
-  return intensity > 0.5 ? "#0A0A0F" : "#E8E8F0";
+  return intensity > 0.55 ? "#0A0A0F" : "#E8E8F0";
+}
+
+function makeProjection(features: any[], width: number, height: number, padding = 24) {
+  let minLon = Infinity, maxLon = -Infinity, minLat = Infinity, maxLat = -Infinity;
+  features.forEach(f => {
+    const ring = f.geometry.coordinates[0] as [number, number][];
+    ring.forEach(([lon, lat]) => {
+      if (lon < minLon) minLon = lon;
+      if (lon > maxLon) maxLon = lon;
+      if (lat < minLat) minLat = lat;
+      if (lat > maxLat) maxLat = lat;
+    });
+  });
+  const lonRange = maxLon - minLon;
+  const latRange = maxLat - minLat;
+  const scaleX = (width - padding * 2) / lonRange;
+  const scaleY = (height - padding * 2) / latRange;
+  const scale = Math.min(scaleX, scaleY);
+  const offsetX = padding + (width - padding * 2 - lonRange * scale) / 2;
+  const offsetY = padding + (height - padding * 2 - latRange * scale) / 2;
+  return (lon: number, lat: number): [number, number] => [
+    offsetX + (lon - minLon) * scale,
+    offsetY + (maxLat - lat) * scale,
+  ];
+}
+
+function ringToPath(ring: number[][], project: (lon: number, lat: number) => [number, number]): string {
+  return ring.map(([lon, lat], i) => {
+    const [x, y] = project(lon, lat);
+    return `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(" ") + "Z";
+}
+
+function ringCentroid(ring: number[][], project: (lon: number, lat: number) => [number, number]): [number, number] {
+  const pts = ring.map(([lon, lat]) => project(lon, lat));
+  return [
+    pts.reduce((s, p) => s + p[0], 0) / pts.length,
+    pts.reduce((s, p) => s + p[1], 0) / pts.length,
+  ];
 }
 
 export default function UruguayMap({ orders }: UruguayMapProps) {
   const [metric, setMetric] = useState<"count" | "revenue">("count");
   const [hovered, setHovered] = useState<string | null>(null);
+  const [dims, setDims] = useState({ width: 480, height: 504 });
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const update = () => {
+      if (containerRef.current) {
+        const w = containerRef.current.clientWidth;
+        setDims({ width: w, height: Math.round(w * 1.05) });
+      }
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    if (containerRef.current) ro.observe(containerRef.current);
+    return () => ro.disconnect();
+  }, []);
 
   const deptData = useMemo(() => {
     const map: Record<string, { count: number; revenue: number }> = {};
@@ -98,7 +111,16 @@ export default function UruguayMap({ orders }: UruguayMapProps) {
     return map;
   }, [orders]);
 
-  const maxVal = useMemo(() => Math.max(...Object.values(deptData).map(d => d[metric]), 1), [deptData, metric]);
+  const maxVal = useMemo(() =>
+    Math.max(...Object.values(deptData).map(d => d[metric]), 1),
+    [deptData, metric]
+  );
+
+  const project = useMemo(
+    () => makeProjection(URUGUAY_GEOJSON.features as any[], dims.width, dims.height),
+    [dims]
+  );
+
   const totalOrders = orders.filter(o => o.departamentoEntrega).length;
 
   const formatVal = (v: number) => {
@@ -107,21 +129,25 @@ export default function UruguayMap({ orders }: UruguayMapProps) {
       if (v >= 1_000) return `$${(v / 1_000).toFixed(0)}K`;
       return `$${v.toFixed(0)}`;
     }
-    return `${v}`;
+    return v.toLocaleString("es-UY");
   };
 
-  // Sort depts for ranking
-  const deptRanking = Object.entries(deptData)
-    .sort((a, b) => b[1][metric] - a[1][metric]);
-
+  const deptRanking = Object.entries(deptData).sort((a, b) => b[1][metric] - a[1][metric]);
   const hoveredData = hovered ? deptData[hovered] : null;
+
+  const shortLabel = (dept: string) => {
+    if (dept === "Treinta y Tres") return "TyT";
+    if (dept === "Cerro Largo") return "C.Largo";
+    if (dept === "Río Negro") return "R.Negro";
+    return dept;
+  };
 
   return (
     <div className="bg-brand-card border border-brand-border rounded-2xl p-6">
       <div className="flex items-start justify-between mb-6 flex-wrap gap-3">
         <div>
-          <h3 className="font-display font-semibold text-brand-text text-lg mb-0.5">Entregas por Departamento</h3>
-          <p className="text-brand-sub text-sm">{totalOrders} entregas con ubicación registrada</p>
+          <h3 className="font-display font-semibold text-brand-text text-lg mb-0.5">Mapa de Entregas — Uruguay</h3>
+          <p className="text-brand-sub text-sm">{totalOrders.toLocaleString("es-UY")} entregas con departamento registrado</p>
         </div>
         <div className="flex bg-brand-dark border border-brand-border rounded-lg overflow-hidden">
           {(["count", "revenue"] as const).map(m => (
@@ -133,120 +159,119 @@ export default function UruguayMap({ orders }: UruguayMapProps) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
 
-        {/* Mapa SVG */}
-        <div className="lg:col-span-2">
-          <div className="relative bg-[#12121E] rounded-xl overflow-hidden" style={{ paddingBottom: "75%" }}>
-            <svg
-              viewBox="0 0 500 500"
-              className="absolute inset-0 w-full h-full"
-              style={{ display: "block" }}
-            >
-              {/* Fondo */}
-              <rect width="500" height="500" fill="#0D0D1A" />
+        {/* SVG Map */}
+        <div className="lg:col-span-2 relative" ref={containerRef}>
+          <svg
+            width="100%"
+            viewBox={`0 0 ${dims.width} ${dims.height}`}
+            style={{ display: "block", borderRadius: 12, background: "#0D0D1A" }}
+          >
+            {(URUGUAY_GEOJSON.features as any[]).map((feature: any) => {
+              const geoName: string = feature.properties.name;
+              const dept = normalizeDept(geoName);
+              const val = deptData[dept]?.[metric] || 0;
+              const intensity = maxVal > 0 ? val / maxVal : 0;
+              const fill = getHeatColor(intensity);
+              const textColor = getTextColor(intensity);
+              const isHovered = hovered === dept;
+              const ring = feature.geometry.coordinates[0] as number[][];
+              const pathD = ringToPath(ring, project);
+              const [cx, cy] = ringCentroid(ring, project);
+              const isSmall = dept === "Montevideo" || dept === "Flores" || dept === "Colonia" || dept === "San José";
 
-              {/* Departamentos */}
-              {Object.entries(DEPT_PATHS).map(([dept, path]) => {
-                const val = deptData[dept]?.[metric] || 0;
-                const intensity = val / maxVal;
-                const fill = getHeatColor(intensity);
-                const textColor = getTextColor(intensity);
-                const isHovered = hovered === dept;
-                const [cx, cy] = DEPT_CENTROIDS[dept] || [0, 0];
-
-                return (
-                  <g key={dept}
-                    onMouseEnter={() => setHovered(dept)}
-                    onMouseLeave={() => setHovered(null)}
-                    style={{ cursor: "pointer" }}
-                  >
-                    <path
-                      d={path}
-                      fill={fill}
-                      stroke={isHovered ? "#FFE500" : "#0D0D1A"}
-                      strokeWidth={isHovered ? 2 : 1}
-                      opacity={isHovered ? 1 : 0.9}
-                      style={{ transition: "all 0.15s ease" }}
-                    />
-                    {/* Label */}
-                    <text
-                      x={cx}
-                      y={cy}
-                      textAnchor="middle"
-                      dominantBaseline="middle"
-                      fill={textColor}
-                      fontSize={dept === "Montevideo" ? 7 : 8}
-                      fontFamily="DM Mono"
-                      fontWeight="600"
-                      style={{ pointerEvents: "none", userSelect: "none" }}
-                    >
-                      {DEPT_ABBR[dept] || dept.slice(0, 3)}
+              return (
+                <g key={dept}
+                  onMouseEnter={() => setHovered(dept)}
+                  onMouseLeave={() => setHovered(null)}
+                  style={{ cursor: "pointer" }}
+                >
+                  <path
+                    d={pathD}
+                    fill={fill}
+                    stroke={isHovered ? "#FFE500" : "#0D0D1A"}
+                    strokeWidth={isHovered ? 2 : 0.8}
+                    style={{ transition: "fill 0.25s ease" }}
+                  />
+                  <text x={cx} y={cy - (val > 0 && !isSmall ? 5 : 0)}
+                    textAnchor="middle" dominantBaseline="middle"
+                    fill={textColor} fontSize={isSmall ? 7 : 9}
+                    fontFamily="DM Sans" fontWeight="700"
+                    style={{ pointerEvents: "none", userSelect: "none" }}>
+                    {shortLabel(dept)}
+                  </text>
+                  {val > 0 && !isSmall && (
+                    <text x={cx} y={cy + 7}
+                      textAnchor="middle" dominantBaseline="middle"
+                      fill={textColor} fontSize={7} fontFamily="DM Mono"
+                      style={{ pointerEvents: "none", userSelect: "none", opacity: 0.9 }}>
+                      {formatVal(val)}
                     </text>
-                    {val > 0 && (
-                      <text
-                        x={cx}
-                        y={cy + 10}
-                        textAnchor="middle"
-                        dominantBaseline="middle"
-                        fill={textColor}
-                        fontSize={6}
-                        fontFamily="DM Mono"
-                        style={{ pointerEvents: "none", userSelect: "none", opacity: 0.8 }}
-                      >
-                        {formatVal(val)}
-                      </text>
-                    )}
-                  </g>
-                );
-              })}
-            </svg>
+                  )}
+                </g>
+              );
+            })}
+          </svg>
 
-            {/* Tooltip hover */}
-            {hovered && hoveredData && (
-              <div className="absolute top-3 left-3 bg-brand-dark/95 border border-brand-border rounded-xl px-4 py-3 shadow-xl pointer-events-none">
-                <p className="text-brand-text font-mono font-bold text-sm">{hovered}</p>
-                <p className="text-brand-yellow font-mono text-xs mt-1">
-                  {hoveredData.count} entregas
-                </p>
-                <p className="text-brand-sub font-mono text-xs">
-                  ${hoveredData.revenue.toLocaleString("es-UY", { maximumFractionDigits: 0 })} ingresos
-                </p>
-                <p className="text-brand-muted font-mono text-xs mt-1">
-                  {maxVal > 0 ? ((hoveredData[metric] / maxVal) * 100).toFixed(1) : 0}% del máximo
-                </p>
-              </div>
-            )}
-          </div>
+          {/* Hover card */}
+          {hovered && (
+            <div className="absolute top-3 left-3 bg-[#0A0A0F]/95 border border-brand-border rounded-xl px-4 py-3 shadow-xl pointer-events-none min-w-[170px]">
+              <p className="text-brand-text font-mono font-bold text-sm">{hovered}</p>
+              {hoveredData ? (
+                <>
+                  <p className="text-brand-yellow font-mono text-xs mt-1 font-bold">
+                    {hoveredData.count.toLocaleString("es-UY")} entregas
+                  </p>
+                  <p className="text-brand-sub font-mono text-xs">
+                    {formatVal(hoveredData.revenue)} ingresos
+                  </p>
+                  <div className="mt-2 h-1 bg-brand-dark rounded-full overflow-hidden">
+                    <div className="h-full rounded-full bg-brand-yellow transition-all"
+                      style={{ width: `${maxVal > 0 ? (hoveredData[metric] / maxVal * 100) : 0}%` }} />
+                  </div>
+                  <p className="text-brand-muted font-mono text-xs mt-1">
+                    {maxVal > 0 ? ((hoveredData[metric] / maxVal) * 100).toFixed(1) : 0}% del máximo
+                  </p>
+                </>
+              ) : (
+                <p className="text-brand-muted font-mono text-xs mt-1">Sin entregas registradas</p>
+              )}
+            </div>
+          )}
 
-          {/* Leyenda */}
-          <div className="flex items-center gap-2 mt-3 justify-center">
+          {/* Legend */}
+          <div className="flex items-center gap-1.5 mt-3 justify-center">
             <span className="text-brand-muted text-xs font-mono">Sin datos</span>
-            {["#2A2A3E", "#1a3a5c", "#1e5f8a", "#2b8fbd", "#f0a500", "#f5c518", "#FFE500"].map((c, i) => (
-              <div key={i} className="w-7 h-3 rounded-sm" style={{ background: c }} />
+            {[0, 0.12, 0.28, 0.48, 0.68, 0.84, 1].map((v, i) => (
+              <div key={i} className="w-7 h-3 rounded-sm" style={{ background: getHeatColor(v) }} />
             ))}
-            <span className="text-brand-muted text-xs font-mono">Mayor</span>
+            <span className="text-brand-muted text-xs font-mono">Máximo</span>
           </div>
         </div>
 
         {/* Ranking */}
         <div>
           <p className="text-brand-sub text-xs font-mono uppercase tracking-wider mb-3">
-            Ranking · {metric === "count" ? "entregas" : "ingresos"}
+            Ranking — {metric === "count" ? "entregas" : "ingresos"}
           </p>
-          <div className="space-y-2 max-h-[380px] overflow-y-auto pr-1">
-            {deptRanking.map(([dept, vals], i) => {
+          <div className="space-y-1.5 max-h-[520px] overflow-y-auto pr-1">
+            {deptRanking.length === 0 ? (
+              <p className="text-brand-muted text-xs font-mono text-center py-8">
+                Sin datos de departamento.
+              </p>
+            ) : deptRanking.map(([dept, vals], i) => {
               const val = vals[metric];
               const pct = maxVal > 0 ? (val / maxVal) * 100 : 0;
               return (
                 <div key={dept}
-                  className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-all ${hovered === dept ? "bg-brand-yellow/10" : "hover:bg-brand-dark"}`}
+                  className={`flex items-center gap-2 px-2 py-2 rounded-lg cursor-pointer transition-all ${hovered === dept ? "bg-brand-yellow/10" : "hover:bg-brand-dark"}`}
                   onMouseEnter={() => setHovered(dept)}
                   onMouseLeave={() => setHovered(null)}
                 >
-                  <span className="text-brand-muted font-mono text-xs w-4 text-right shrink-0">{i + 1}</span>
+                  <span className="text-brand-muted font-mono text-xs w-5 text-right shrink-0">{i + 1}</span>
                   <div className="flex-1 min-w-0">
-                    <div className="flex justify-between mb-1">
+                    <div className="flex justify-between items-center mb-1">
                       <span className="text-brand-text text-xs font-mono truncate">{dept}</span>
                       <span className="text-brand-yellow text-xs font-mono font-bold ml-2 shrink-0">{formatVal(val)}</span>
                     </div>
@@ -258,11 +283,6 @@ export default function UruguayMap({ orders }: UruguayMapProps) {
                 </div>
               );
             })}
-            {deptRanking.length === 0 && (
-              <p className="text-brand-muted text-xs font-mono text-center py-8">
-                Sin datos de departamento.<br />Asegurate de haber recargado el histórico con las nuevas columnas.
-              </p>
-            )}
           </div>
         </div>
       </div>
