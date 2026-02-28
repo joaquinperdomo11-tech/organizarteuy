@@ -9,6 +9,7 @@ import WaterfallChart from "./WaterfallChart";
 import SalesHeatmap from "./SalesHeatmap";
 import SkuPerformance from "./SkuPerformance";
 import UruguayMap from "./UruguayMap";
+import MontevideoMap from "./MontevideoMap";
 import StockDashboard from "./StockDashboard";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, LabelList,
@@ -261,16 +262,28 @@ export default function Dashboard() {
             TAB: GEOGRÁFICO
         ══════════════════════════════════════════════════════════ */}
         {activeTab === "geografico" && (
-          <section>
-            {loading ? <Skeleton className="h-[600px] rounded-2xl" /> : (
-              <UruguayMap orders={(data?.orders || []).map(o => ({
-                departamentoEntrega: o.departamentoEntrega || "",
-                ciudadEntrega: o.ciudadEntrega || "",
-                totalItem: o.totalItem,
-                fecha: o.fecha,
-              }))} />
-            )}
-          </section>
+          <div className="space-y-8">
+            <section>
+              {loading ? <Skeleton className="h-[600px] rounded-2xl" /> : (
+                <UruguayMap orders={(data?.orders || []).map(o => ({
+                  departamentoEntrega: o.departamentoEntrega || "",
+                  ciudadEntrega: o.ciudadEntrega || "",
+                  totalItem: o.totalItem,
+                  fecha: o.fecha,
+                }))} />
+              )}
+            </section>
+            <section>
+              {loading ? <Skeleton className="h-[600px] rounded-2xl" /> : (
+                <MontevideoMap orders={(data?.orders || []).map(o => ({
+                  departamentoEntrega: o.departamentoEntrega || "",
+                  ciudadEntrega: o.ciudadEntrega || "",
+                  totalItem: o.totalItem,
+                  fecha: o.fecha,
+                }))} />
+              )}
+            </section>
+          </div>
         )}
 
         {/* ══════════════════════════════════════════════════════════
