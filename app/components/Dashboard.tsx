@@ -8,6 +8,8 @@ import OrdersTable from "./OrdersTable";
 import WaterfallChart from "./WaterfallChart";
 import SalesHeatmap from "./SalesHeatmap";
 import SkuPerformance from "./SkuPerformance";
+import UruguayMap from "./UruguayMap";
+import StockDashboard from "./StockDashboard";
 
 function Skeleton({ className }: { className: string }) {
   return <div className={`skeleton ${className}`} />;
@@ -289,6 +291,42 @@ export default function Dashboard() {
             <SkuPerformance data={data?.skuPerformance || []} />
           )}
         </section>
+
+        {/* ── Mapa de entregas ───────────────────────────────────── */}
+        <section>
+          {loading ? (
+            <Skeleton className="h-96 rounded-2xl" />
+          ) : (
+            <UruguayMap orders={(data?.orders || []).map(o => ({
+              departamentoEntrega: o.departamentoEntrega || "",
+              ciudadEntrega: o.ciudadEntrega || "",
+              totalItem: o.totalItem,
+              fecha: o.fecha,
+            }))} />
+          )}
+        </section>
+
+        {/* ── Stock Dashboard ─────────────────────────────────────── */}
+        {(data?.stock?.length || 0) > 0 && (
+          <section>
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-brand-sub text-xs font-mono uppercase tracking-widest">Stock & Cobertura</p>
+            </div>
+            {loading ? (
+              <Skeleton className="h-96 rounded-2xl" />
+            ) : (
+              <StockDashboard
+                stock={data?.stock || []}
+                orders={(data?.orders || []).map(o => ({
+                  sku: o.sku,
+                  itemIdML: o.itemIdML || "",
+                  cantidad: o.cantidad,
+                  fecha: o.fecha,
+                }))}
+              />
+            )}
+          </section>
+        )}
 
         {/* ── Tabla de órdenes ───────────────────────────────────── */}
         <section>
