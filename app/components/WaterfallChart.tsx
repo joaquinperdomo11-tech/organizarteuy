@@ -111,7 +111,7 @@ export default function WaterfallChart({ allOrders }: WaterfallProps) {
   const [showPicker, setShowPicker] = useState(false);
   const [showAds, setShowAds] = useState(true);
 
-  const { totalInversion: adsTotal, periodo, ads } = useAds();
+  const { getTotalInversionForMonth, months } = useAds();
 
   const filteredOrders = useMemo(() => {
     if (selectedMonth === "year") {
@@ -125,30 +125,24 @@ export default function WaterfallChart({ allOrders }: WaterfallProps) {
     });
   }, [allOrders, selectedMonth]);
 
-  // Match ads period to selected month if possible
-  // If ads are loaded and match the selected month, use that inversion
-  // Otherwise use total inversion as-is
+  // Get ads inversion for exactly the selected month
   const adsInversion = useMemo(() => {
-    if (!ads.length) return 0;
-    // Check if ads period matches selected month
-    // ads[0].desde is like "01-feb-2026"
-    const adMonths = new Set(ads.map(a => {
-      const parts = a.desde.split("-");
-      const monthNames: Record<string,string> = {
-        "ene":"01","feb":"02","mar":"03","abr":"04","may":"05","jun":"06",
-        "jul":"07","ago":"08","sep":"09","oct":"10","nov":"11","dic":"12"
-      };
-      if (parts.length === 3) {
-        const m = monthNames[parts[1].toLowerCase()] || "01";
-        return `${parts[2]}-${m}`;
-      }
-      return "";
-    }).filter(Boolean));
+    if (selectedMonth === "year") {
+      // Sum all loaded months for the current year
+      const curYear = new Date().getFullYear().toString();
+      return months
+        .filter(m => m.monthKey.startsWith(curYear))
+        .reduce((s, m) => s + m.totalInversion, 0);
+    }
+    return getTotalInversionForMonth(selectedMonth);
+  }, [selectedMonth, getTotalInversionForMonth, months]);
 
-    if (selectedMonth === "year") return adsTotal;
-    if (adMonths.has(selectedMonth)) return adsTotal;
-    return 0; // ads don't match this month
-  }, [ads, adsTotal, selectedMonth]);
+  // Period label for the ads
+  const adsPeriodo = useMemo(() => {
+    if (selectedMonth === "year") return `Año ${new Date().getFullYear()}`;
+    const m = months.find(mo => mo.monthKey === selectedMonth);
+    return m ? `${m.desde} — ${m.hasta}` : "";
+  }, [selectedMonth, months]);
 
   const hasAds = adsInversion > 0;
 
@@ -224,7 +218,7 @@ export default function WaterfallChart({ allOrders }: WaterfallProps) {
         <div className="flex items-center gap-2 mb-4 px-3 py-2 bg-[#CC44FF]/5 border border-[#CC44FF]/20 rounded-xl">
           <span className="text-[#CC44FF] text-xs">📣</span>
           <p className="text-[#CC44FF] text-xs font-mono">
-            Incluye {formatCurrency(adsInversion)} de inversión en publicidad · {periodo}
+            Incluye {formatCurrency(adsInversion)} de inversión en publicidad · {adsPeriodo}
           </p>
         </div>
       )}
