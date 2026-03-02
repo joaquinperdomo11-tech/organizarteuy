@@ -59,6 +59,7 @@ export interface DashboardData {
   skuPerformance: {
     sku: string;
     name: string;
+    itemIdML: string;
     units: number;
     revenue: number;
     margen: number;
@@ -132,7 +133,9 @@ export async function fetchDashboardData(): Promise<DashboardData> {
 
   if (!Array.isArray(rawOrders)) throw new Error("El Apps Script no devolvió un array JSON válido.");
 
-  const orders: Order[] = rawOrders.map((r) => ({
+  const orders: Order[] = rawOrders
+  .filter((r) => String(r["Estado"] ?? "") !== "cancelled")
+  .map((r) => ({
     orderId: String(r["Order ID"] ?? ""),
     fecha: String(r["Fecha"] ?? ""),
     hora: String(r["Hora"] ?? ""),
@@ -340,14 +343,14 @@ function processData(orders: Order[], stock: StockItem[] = []): DashboardData {
 
   // ── SKU Performance ──────────────────────────────────────────
   const skuMap: Record<string, {
-    name: string; units: number; revenue: number;
+    name: string; itemIdML: string; units: number; revenue: number;
     margen: number; comision: number; envio: number;
   }> = {};
 
   orders.forEach((o) => {
     const key = o.sku || o.producto?.slice(0, 20) || "SIN SKU";
     if (!skuMap[key]) {
-      skuMap[key] = { name: o.producto, units: 0, revenue: 0, margen: 0, comision: 0, envio: 0 };
+      skuMap[key] = { name: o.producto, itemIdML: o.itemIdML || '', units: 0, revenue: 0, margen: 0, comision: 0, envio: 0 };
     }
     skuMap[key].units += o.cantidad;
     skuMap[key].revenue += o.totalItem;
@@ -459,6 +462,5 @@ function processData(orders: Order[], stock: StockItem[] = []): DashboardData {
     prevMonth: prevMonthData,
     revenueCurrentMonth,
     revenuePrevMonth,
-    stock,
   };
 }
