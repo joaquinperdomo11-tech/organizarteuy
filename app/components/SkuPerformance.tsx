@@ -1,7 +1,7 @@
 "use client";
 import { useState, useMemo } from "react";
 import clsx from "clsx";
-import { useAds } from "./AdsContext";
+import { useAds, monthKeyToLabel } from "./AdsContext";
 
 interface SkuPerformanceProps {
   data: {
@@ -64,18 +64,25 @@ export default function SkuPerformance({ data }: SkuPerformanceProps) {
   const [search, setSearch] = useState("");
   const [showAds, setShowAds] = useState(true);
 
-  const { getInversionByItemId, totalInversion, periodo, ads } = useAds();
-  const hasAds = ads.length > 0;
+  const { getInversionForMonth, getTotalInversionForMonth, months } = useAds();
+
+  // Use the most recent loaded month for SKU performance
+  // (SKU performance is all-time, so we use the latest ads month as reference)
+  const latestAdsMonth = months[months.length - 1];
+  const hasAds = !!latestAdsMonth;
+  const totalInversion = latestAdsMonth ? latestAdsMonth.totalInversion : 0;
+  const periodo = latestAdsMonth ? `${latestAdsMonth.desde} — ${latestAdsMonth.hasta}` : "";
 
   // Enrich data with ads
   const enriched = useMemo(() => {
+    if (!latestAdsMonth) return data.map(d => ({ ...d, inversion: 0, margenConAds: d.margen, margenConAdsPct: d.margenPct }));
     return data.map(d => {
-      const inversion = getInversionByItemId(d.itemIdML);
+      const inversion = getInversionForMonth(latestAdsMonth.monthKey, d.itemIdML);
       const margenConAds = d.margen - inversion;
       const margenConAdsPct = d.revenue > 0 ? (margenConAds / d.revenue) * 100 : 0;
       return { ...d, inversion, margenConAds, margenConAdsPct };
     });
-  }, [data, getInversionByItemId]);
+  }, [data, latestAdsMonth, getInversionForMonth]);
 
   const filtered = useMemo(() => {
     return enriched
