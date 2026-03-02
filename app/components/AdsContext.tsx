@@ -36,30 +36,25 @@ export interface AdsMonth {
 }
 
 interface AdsContextType {
-  // All loaded months
   months: AdsMonth[];
-  // Add a new month's data (replaces if same monthKey)
-  addMonth: (rows: AdRow[]) => void;
-  // Remove a month
-  removeMonth: (monthKey: string) => void;
-  // Get inversion for a specific month and itemId
+  addMonth: (rows: AdRow[]) => Promise<{ ok: boolean; error?: string }>;
+  removeMonth: (monthKey: string) => Promise<void>;
   getInversionForMonth: (monthKey: string, itemId: string) => number;
-  // Get total inversion for a month
   getTotalInversionForMonth: (monthKey: string) => number;
-  // Get all rows for a month
   getRowsForMonth: (monthKey: string) => AdRow[];
-  // Loading state
   loading: boolean;
+  saving: boolean;
 }
 
 const AdsContext = createContext<AdsContextType>({
   months: [],
-  addMonth: () => {},
-  removeMonth: () => {},
+  addMonth: async () => ({ ok: false }),
+  removeMonth: async () => {},
   getInversionForMonth: () => 0,
   getTotalInversionForMonth: () => 0,
   getRowsForMonth: () => [],
   loading: false,
+  saving: false,
 });
 
 const MONTH_NAMES: Record<string, string> = {
@@ -68,7 +63,6 @@ const MONTH_NAMES: Record<string, string> = {
 };
 
 export function parseMonthKey(desde: string): string {
-  // Input: "01-feb-2026" -> "2026-02"
   const parts = desde.toLowerCase().split("-");
   if (parts.length === 3) {
     const month = MONTH_NAMES[parts[1]] || "01";
@@ -83,97 +77,146 @@ export function monthKeyToLabel(key: string): string {
   return `${names[parseInt(month) - 1]} ${year.slice(2)}`;
 }
 
-const STORAGE_KEY = "ads-months-v1";
+const WEBAPP_URL = process.env.NEXT_PUBLIC_APPS_SCRIPT_URL || "";
+
+async function callScript(action: string, data?: any) {
+  const res = await fetch(WEBAPP_URL, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain" }, // Apps Script requires text/plain for doPost
+    body: JSON.stringify({ action, ...data }),
+  });
+  return res.json();
+}
+
+function buildAdsMonth(monthKey: string, desde: string, hasta: string, rows: AdRow[]): AdsMonth {
+  return {
+    monthKey,
+    label: monthKeyToLabel(monthKey),
+    desde,
+    hasta,
+    rows,
+    totalInversion: rows.reduce((s, r) => s + r.inversion, 0),
+    totalIngresos: rows.reduce((s, r) => s + r.ingresos, 0),
+    uploadedAt: new Date().toISOString(),
+  };
+}
 
 export function AdsProvider({ children }: { children: ReactNode }) {
   const [months, setMonths] = useState<AdsMonth[]>([]);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
-  // Load from localStorage on mount
+  // Load from Sheets on mount (same fetch as dashboard data)
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved) as AdsMonth[];
-        setMonths(parsed);
+    const load = async () => {
+      try {
+        const res = await fetch(WEBAPP_URL);
+        const json = await res.json();
+        const publicidad: any[] = json.publicidad || [];
+
+        const loaded: AdsMonth[] = publicidad.map((m: any) => {
+          const rows: AdRow[] = (m.rows || []).map((r: any) => ({
+            desde: r.desde || m.desde || "",
+            hasta: r.hasta || m.hasta || "",
+            campana: r.campana || "",
+            titulo: r.titulo || "",
+            itemId: r.itemId || "",
+            estado: r.estado || "",
+            impresiones: Number(r.impresiones) || 0,
+            clics: Number(r.clics) || 0,
+            cpc: Number(r.cpc) || 0,
+            ctr: Number(r.ctr) || 0,
+            cvr: Number(r.cvr) || 0,
+            ingresos: Number(r.ingresos) || 0,
+            inversion: Number(r.inversion) || 0,
+            acos: Number(r.acos) || 0,
+            roas: Number(r.roas) || 0,
+            ventasDirectas: Number(r.ventasDirectas) || 0,
+            ventasIndirectas: Number(r.ventasIndirectas) || 0,
+            ventasPublicidad: Number(r.ventasPublicidad) || 0,
+            ingresosDirectos: Number(r.ingresosDirectos) || 0,
+            ingresosIndirectos: Number(r.ingresosIndirectos) || 0,
+          }));
+          return buildAdsMonth(m.monthKey, m.desde, m.hasta, rows);
+        });
+
+        setMonths(loaded.sort((a, b) => a.monthKey.localeCompare(b.monthKey)));
+      } catch (e) {
+        console.warn("Error loading publicidad:", e);
+      } finally {
+        setLoading(false);
       }
-    } catch (e) {
-      console.warn("Could not load ads from storage:", e);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  // Persist to localStorage whenever months change
-  const persist = useCallback((newMonths: AdsMonth[]) => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(newMonths));
-    } catch (e) {
-      console.warn("Could not save ads to storage:", e);
-    }
-    setMonths(newMonths);
-  }, []);
-
-  const addMonth = useCallback((rows: AdRow[]) => {
-    if (!rows.length) return;
-    const monthKey = parseMonthKey(rows[0].desde);
-    if (!monthKey) return;
-
-    const totalInversion = rows.reduce((s, r) => s + r.inversion, 0);
-    const totalIngresos = rows.reduce((s, r) => s + r.ingresos, 0);
-
-    const newMonth: AdsMonth = {
-      monthKey,
-      label: monthKeyToLabel(monthKey),
-      desde: rows[0].desde,
-      hasta: rows[0].hasta,
-      rows,
-      totalInversion,
-      totalIngresos,
-      uploadedAt: new Date().toISOString(),
     };
+    if (WEBAPP_URL) load();
+    else setLoading(false);
+  }, []);
 
-    setMonths(prev => {
-      const filtered = prev.filter(m => m.monthKey !== monthKey);
-      const updated = [...filtered, newMonth].sort((a, b) => a.monthKey.localeCompare(b.monthKey));
-      persist(updated);
-      return updated;
-    });
-  }, [persist]);
+  const addMonth = useCallback(async (rows: AdRow[]): Promise<{ ok: boolean; error?: string }> => {
+    if (!rows.length) return { ok: false, error: "Sin datos" };
+    const monthKey = parseMonthKey(rows[0].desde);
+    if (!monthKey) return { ok: false, error: "No se pudo detectar el mes" };
 
-  const removeMonth = useCallback((monthKey: string) => {
-    setMonths(prev => {
-      const updated = prev.filter(m => m.monthKey !== monthKey);
-      persist(updated);
-      return updated;
-    });
-  }, [persist]);
+    setSaving(true);
+    try {
+      const result = await callScript("guardarPublicidad", {
+        data: {
+          monthKey,
+          desde: rows[0].desde,
+          hasta: rows[0].hasta,
+          rows: rows.map(r => ({
+            itemId: r.itemId, titulo: r.titulo, estado: r.estado,
+            campana: r.campana, impresiones: r.impresiones, clics: r.clics,
+            cpc: r.cpc, ctr: r.ctr, cvr: r.cvr, ingresos: r.ingresos,
+            inversion: r.inversion, acos: r.acos, roas: r.roas,
+            ventasDirectas: r.ventasDirectas, ventasIndirectas: r.ventasIndirectas,
+            ventasPublicidad: r.ventasPublicidad, ingresosDirectos: r.ingresosDirectos,
+            ingresosIndirectos: r.ingresosIndirectos,
+          })),
+        },
+      });
 
-  const getRowsForMonth = useCallback((monthKey: string): AdRow[] => {
-    return months.find(m => m.monthKey === monthKey)?.rows || [];
-  }, [months]);
+      if (!result.ok) return { ok: false, error: result.error || "Error al guardar" };
 
-  const getInversionForMonth = useCallback((monthKey: string, itemId: string): number => {
-    const monthData = months.find(m => m.monthKey === monthKey);
-    if (!monthData) return 0;
-    return monthData.rows
+      const newMonth = buildAdsMonth(monthKey, rows[0].desde, rows[0].hasta, rows);
+      setMonths(prev => {
+        const filtered = prev.filter(m => m.monthKey !== monthKey);
+        return [...filtered, newMonth].sort((a, b) => a.monthKey.localeCompare(b.monthKey));
+      });
+
+      return { ok: true };
+    } catch (e: any) {
+      return { ok: false, error: e.message || "Error de red" };
+    } finally {
+      setSaving(false);
+    }
+  }, []);
+
+  const removeMonth = useCallback(async (monthKey: string) => {
+    setSaving(true);
+    try {
+      await callScript("eliminarPublicidad", { monthKey });
+      setMonths(prev => prev.filter(m => m.monthKey !== monthKey));
+    } finally {
+      setSaving(false);
+    }
+  }, []);
+
+  const getRowsForMonth = useCallback((monthKey: string) =>
+    months.find(m => m.monthKey === monthKey)?.rows || [], [months]);
+
+  const getInversionForMonth = useCallback((monthKey: string, itemId: string) =>
+    (months.find(m => m.monthKey === monthKey)?.rows || [])
       .filter(r => r.itemId === itemId)
-      .reduce((s, r) => s + r.inversion, 0);
-  }, [months]);
+      .reduce((s, r) => s + r.inversion, 0), [months]);
 
-  const getTotalInversionForMonth = useCallback((monthKey: string): number => {
-    return months.find(m => m.monthKey === monthKey)?.totalInversion || 0;
-  }, [months]);
+  const getTotalInversionForMonth = useCallback((monthKey: string) =>
+    months.find(m => m.monthKey === monthKey)?.totalInversion || 0, [months]);
 
   return (
     <AdsContext.Provider value={{
-      months,
-      addMonth,
-      removeMonth,
-      getInversionForMonth,
-      getTotalInversionForMonth,
-      getRowsForMonth,
-      loading,
+      months, addMonth, removeMonth,
+      getInversionForMonth, getTotalInversionForMonth, getRowsForMonth,
+      loading, saving,
     }}>
       {children}
     </AdsContext.Provider>
