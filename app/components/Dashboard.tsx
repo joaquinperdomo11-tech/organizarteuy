@@ -11,6 +11,8 @@ import SkuPerformance from "./SkuPerformance";
 import UruguayMap from "./UruguayMap";
 import MontevideoMap from "./MontevideoMap";
 import StockDashboard from "./StockDashboard";
+import AdsTab from "./AdsTab";
+import { AdsProvider } from "./AdsContext";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, LabelList,
 } from "recharts";
@@ -19,7 +21,7 @@ function Skeleton({ className }: { className: string }) {
   return <div className={`skeleton ${className}`} />;
 }
 
-type Tab = "resumen" | "productos" | "geografico" | "stock" | "ordenes";
+type Tab = "resumen" | "productos" | "geografico" | "stock" | "ordenes" | "publicidad";
 
 const TABS: { key: Tab; label: string; icon: string }[] = [
   { key: "resumen", label: "Resumen", icon: "📊" },
@@ -27,6 +29,7 @@ const TABS: { key: Tab; label: string; icon: string }[] = [
   { key: "geografico", label: "Geográfico", icon: "🗺️" },
   { key: "stock", label: "Stock", icon: "📋" },
   { key: "ordenes", label: "Órdenes", icon: "🛒" },
+  { key: "publicidad", label: "Publicidad", icon: "📣" },
 ];
 
 export default function Dashboard() {
@@ -69,6 +72,7 @@ export default function Dashboard() {
   }
 
   return (
+    <AdsProvider>
     <div className="min-h-screen">
       {/* ── Header ─────────────────────────────────────────────── */}
       <header className="border-b border-brand-border bg-brand-dark/80 backdrop-blur-sm sticky top-0 z-50">
@@ -323,6 +327,15 @@ export default function Dashboard() {
           </section>
         )}
 
+        {/* ══════════════════════════════════════════════════════════
+            TAB: PUBLICIDAD
+        ══════════════════════════════════════════════════════════ */}
+        {activeTab === "publicidad" && (
+          <section>
+            <AdsTab />
+          </section>
+        )}
+
       </main>
 
       <footer className="border-t border-brand-border mt-16 py-6 px-6">
@@ -331,6 +344,7 @@ export default function Dashboard() {
         </p>
       </footer>
     </div>
+    </AdsProvider>
   );
 }
 
