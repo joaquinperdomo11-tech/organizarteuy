@@ -332,7 +332,7 @@ export default function Dashboard() {
         ══════════════════════════════════════════════════════════ */}
         {activeTab === "publicidad" && (
           <section>
-            <AdsTab />
+            <AdsTab salesMonths={(data?.revenueByMonth || []).map(m => m.month)} />
           </section>
         )}
 
