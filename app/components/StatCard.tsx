@@ -12,8 +12,9 @@ interface StatCardProps {
   accent?: boolean;
   delay?: number;
   icon?: string;
-  trend?: number; // percentage change
-  invertTrend?: boolean; // if true, down = good (green), up = bad (red)
+  trend?: number;
+  invertTrend?: boolean;
+  proj?: number; // projected end-of-month value
 }
 
 function useCountUp(target: number, duration = 1200, delay = 0) {
@@ -54,6 +55,7 @@ export default function StatCard({
   icon,
   trend,
   invertTrend = false,
+  proj,
 }: StatCardProps) {
   const animated = useCountUp(value, 1000, delay);
 
@@ -61,6 +63,19 @@ export default function StatCard({
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,
   });
+
+  function fmtProj(v: number) {
+    if (suffix === "%") return `${v.toFixed(1)}%`;
+    if (prefix === "$") {
+      if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(1)}M`;
+      if (v >= 1_000) return `$${(v / 1_000).toFixed(0)}K`;
+      return `$${v.toFixed(0)}`;
+    }
+    if (v >= 1_000) return `${(v / 1_000).toFixed(0)}K`;
+    return v.toFixed(0);
+  }
+
+  const showProj = proj !== undefined && proj > 0 && proj > value * 1.01;
 
   return (
     <div
@@ -127,6 +142,15 @@ export default function StatCard({
           >
             <span>{trend >= 0 ? "▲" : "▼"}</span>
             <span>{Math.abs(trend).toFixed(1)}% vs mes anterior</span>
+          </div>
+        )}
+
+        {showProj && (
+          <div className="flex items-center gap-1.5 mt-2">
+            <svg width="16" height="2"><line x1="0" y1="1" x2="16" y2="1" stroke="#AA88FF" strokeWidth="1.5" strokeDasharray="4,2"/></svg>
+            <span className="text-[#AA88FF] text-xs font-mono">
+              proj. {fmtProj(proj!)}
+            </span>
           </div>
         )}
       </div>
