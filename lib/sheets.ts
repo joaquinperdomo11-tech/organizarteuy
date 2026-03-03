@@ -393,7 +393,7 @@ function processData(orders: Order[], stock: StockItem[] = []): DashboardData {
   // Same day range in previous month (e.g. if today is Feb 27, compare Jan 1-27)
   const prevMonthOrders = orders.filter((o) => {
     const d = new Date(o.fecha);
-    return d.getFullYear() === prevYear && d.getMonth() === prevMonth && d.getDate() <= curDay;
+    return d.getFullYear() === prevYear && d.getMonth() === prevMonth;
   });
 
   function calcPeriodSummary(ords: typeof orders) {
@@ -433,8 +433,9 @@ function processData(orders: Order[], stock: StockItem[] = []): DashboardData {
     });
   }
 
-  // Prev month: same days 1..curDay
-  for (let d = 1; d <= curDay; d++) {
+  // Prev month: all days of the month
+  const prevMonthTotalDays = new Date(prevYear, prevMonth + 1, 0).getDate();
+  for (let d = 1; d <= prevMonthTotalDays; d++) {
     const dayOrders = prevMonthOrders.filter((o) => new Date(o.fecha).getDate() === d);
     revenuePrevMonth.push({
       day: d,
@@ -535,7 +536,6 @@ function processData(orders: Order[], stock: StockItem[] = []): DashboardData {
 
     return {
     orders,
-      stock,
     summary: {
       totalRevenue,
       totalMargen,
