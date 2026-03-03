@@ -536,6 +536,7 @@ function processData(orders: Order[], stock: StockItem[] = []): DashboardData {
 
     return {
     orders,
+      stock, 
     summary: {
       totalRevenue,
       totalMargen,
