@@ -534,7 +534,7 @@ function processData(orders: Order[], stock: StockItem[] = []): DashboardData {
     dailyData: projectionDailyData,
   };
 
-    return {
+      return {
     orders,
     stock,
     summary: {
