@@ -91,6 +91,14 @@ export interface DashboardData {
   };
   revenueCurrentMonth: { day: number; revenue: number; margen: number; orders: number }[];
   revenuePrevMonth: { day: number; revenue: number; margen: number; orders: number }[];
+  projection: {
+    projectedRevenue: number;
+    projectedMargen: number;
+    projectedOrders: number;
+    daysElapsed: number;
+    daysInMonth: number;
+    dailyData: { day: number; revenue: number; margen: number; orders: number }[];
+  };
   stock: StockItem[];
 }
 
@@ -117,8 +125,8 @@ const PAGO_LABELS: Record<string, string> = {
 };
 
 export async function fetchDashboardData(): Promise<DashboardData> {
- const url = process.env.NEXT_PUBLIC_APPS_SCRIPT_URL;
-if (!url) throw new Error("NEXT_PUBLIC_APPS_SCRIPT_URL no está configurada en las variables de entorno.");
+  const url = process.env.APPS_SCRIPT_URL;
+  if (!url) throw new Error("APPS_SCRIPT_URL no está configurada en las variables de entorno.");
 
   const res = await fetch(url, {
     next: { revalidate: parseInt(process.env.REVALIDATE_SECONDS || "300") },
@@ -436,7 +444,96 @@ function processData(orders: Order[], stock: StockItem[] = []): DashboardData {
     });
   }
 
-  return {
+  // ── Proyección ajustada con mes anterior ─────────────────────
+  const daysInMonth = new Date(curYear, curMonth + 1, 0).getDate();
+  const daysElapsed = curDay;
+  const daysRemaining = daysInMonth - daysElapsed;
+
+  // Revenue acumulado mes anterior completo (todos los días del mes)
+  const prevMonthAllOrders = orders.filter((o) => {
+    const d = new Date(o.fecha);
+    return d.getFullYear() === prevYear && d.getMonth() === prevMonth;
+  });
+  const prevMonthDays = new Date(prevYear, prevMonth + 1, 0).getDate();
+
+  // Peso relativo de cada día en el mes anterior
+  // peso[d] = revenue del día d del mes anterior / revenue total del mes anterior
+  const prevDayRevenue: Record<number, number> = {};
+  const prevDayMargen: Record<number, number> = {};
+  const prevDayOrders: Record<number, number> = {};
+  for (let d = 1; d <= prevMonthDays; d++) {
+    const dayOrds = prevMonthAllOrders.filter(o => new Date(o.fecha).getDate() === d);
+    prevDayRevenue[d] = dayOrds.reduce((s, o) => s + o.totalItem, 0);
+    prevDayMargen[d]  = dayOrds.reduce((s, o) => s + o.margenReal, 0);
+    prevDayOrders[d]  = dayOrds.length;
+  }
+  const prevTotalRevenue = Object.values(prevDayRevenue).reduce((s, v) => s + v, 0);
+  const prevTotalMargen  = Object.values(prevDayMargen).reduce((s, v) => s + v, 0);
+  const prevTotalOrders  = Object.values(prevDayOrders).reduce((s, v) => s + v, 0);
+
+  // Revenue actual acumulado en los días transcurridos
+  const curTotalRevenue = currentMonthOrders.reduce((s, o) => s + o.totalItem, 0);
+  const curTotalMargen  = currentMonthOrders.reduce((s, o) => s + o.margenReal, 0);
+  const curTotalOrders  = currentMonthOrders.length;
+
+  // Factor de ajuste: qué % del mes anterior se hizo en los días transcurridos
+  const prevWeightElapsed = prevTotalRevenue > 0
+    ? Object.entries(prevDayRevenue)
+        .filter(([d]) => parseInt(d) <= daysElapsed)
+        .reduce((s, [, v]) => s + v, 0) / prevTotalRevenue
+    : daysElapsed / prevMonthDays;
+
+  const prevWeightRemaining = 1 - prevWeightElapsed;
+
+  // Proyección: si el ritmo actual se mantiene proporcional al patrón del mes anterior
+  // projected = curActual / prevWeightElapsed * 1 (escalar al mes completo)
+  const projectedRevenue = prevWeightElapsed > 0 ? curTotalRevenue / prevWeightElapsed : curTotalRevenue;
+  const projectedMargen  = prevWeightElapsed > 0 ? curTotalMargen  / prevWeightElapsed : curTotalMargen;
+  const projectedOrders  = prevWeightElapsed > 0 ? curTotalOrders  / prevWeightElapsed : curTotalOrders;
+
+  // Day-by-day projection data (real hasta hoy, proyectado para los días restantes)
+  const projectionDailyData: { day: number; revenue: number; margen: number; orders: number }[] = [];
+
+  // Days already elapsed: use real data
+  for (let d = 1; d <= daysElapsed; d++) {
+    const dayOrds = currentMonthOrders.filter(o => new Date(o.fecha).getDate() === d);
+    projectionDailyData.push({
+      day: d,
+      revenue: dayOrds.reduce((s, o) => s + o.totalItem, 0),
+      margen:  dayOrds.reduce((s, o) => s + o.margenReal, 0),
+      orders:  dayOrds.length,
+    });
+  }
+
+  // Remaining days: distribute remaining projected revenue using prev month weights
+  const prevWeightRemainingDays = Object.entries(prevDayRevenue)
+    .filter(([d]) => parseInt(d) > daysElapsed)
+    .reduce((s, [, v]) => s + v, 0);
+
+  const remainingRevenue = projectedRevenue - curTotalRevenue;
+  const remainingMargen  = projectedMargen  - curTotalMargen;
+  const remainingOrders  = projectedOrders  - curTotalOrders;
+
+  for (let d = daysElapsed + 1; d <= daysInMonth; d++) {
+    const dayWeight = prevWeightRemainingDays > 0 ? (prevDayRevenue[d] || 0) / prevWeightRemainingDays : 1 / daysRemaining;
+    projectionDailyData.push({
+      day: d,
+      revenue: Math.max(0, remainingRevenue * dayWeight),
+      margen:  Math.max(0, remainingMargen  * dayWeight),
+      orders:  Math.max(0, remainingOrders  * dayWeight),
+    });
+  }
+
+  const projection = {
+    projectedRevenue,
+    projectedMargen,
+    projectedOrders,
+    daysElapsed,
+    daysInMonth,
+    dailyData: projectionDailyData,
+  };
+
+    return {
     orders,
     summary: {
       totalRevenue,
@@ -462,6 +559,6 @@ function processData(orders: Order[], stock: StockItem[] = []): DashboardData {
     prevMonth: prevMonthData,
     revenueCurrentMonth,
     revenuePrevMonth,
-    stock,
+    projection,
   };
 }
