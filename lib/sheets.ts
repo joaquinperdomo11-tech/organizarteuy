@@ -117,8 +117,8 @@ const PAGO_LABELS: Record<string, string> = {
 };
 
 export async function fetchDashboardData(): Promise<DashboardData> {
-  const url = process.env.APPS_SCRIPT_URL;
-  if (!url) throw new Error("APPS_SCRIPT_URL no está configurada en las variables de entorno.");
+ const url = process.env.NEXT_PUBLIC_APPS_SCRIPT_URL;
+if (!url) throw new Error("NEXT_PUBLIC_APPS_SCRIPT_URL no está configurada en las variables de entorno.");
 
   const res = await fetch(url, {
     next: { revalidate: parseInt(process.env.REVALIDATE_SECONDS || "300") },
