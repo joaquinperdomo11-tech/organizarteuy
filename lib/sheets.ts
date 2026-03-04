@@ -28,7 +28,7 @@ export interface Order {
 
 export interface LogisticaRow {
   numProveedor: string;
-  idMeli: string;
+  shipmentId: string;
   fechaEntrega: string;
   zona: string;
   precioProveedor: number;
