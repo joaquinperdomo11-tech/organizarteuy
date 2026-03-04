@@ -25,7 +25,7 @@ interface LogisticaMonth {
 }
 
 interface ReconciliationRow {
-  idMeli: string;
+  shipmentId: string;
   numProveedor: string;
   fechaEntrega: string;
   zona: string;
@@ -125,8 +125,9 @@ function parsePDF(text: string): { rows: ProveedorRow[]; monthKey: string } {
       }
     }
 
-    if (numProveedor && (fechaEntrega || idMeli)) {
-      rows.push({ numProveedor, idMeli, fechaEntrega, zona, precioProveedor, estadoProveedor, repartidor, direccion, tipo });
+    const shipmentId = idMeli; // ID Meli in the PDF is actually the Shipment ID
+    if (numProveedor && (fechaEntrega || shipmentId)) {
+      rows.push({ numProveedor, shipmentId, fechaEntrega, zona, precioProveedor, estadoProveedor, repartidor, direccion, tipo });
     }
   }
 
@@ -142,14 +143,14 @@ function reconcile(provRows: ProveedorRow[], orders: Order[], monthKey: string):
     return key === monthKey && o.tipoEnvio === "FLEX";
   });
 
-  const orderById = new Map(flexOrders.map(o => [String(o.orderId), o]));
-  const billedIds = new Set<string>();
+  const orderByShipment = new Map(flexOrders.map(o => [String(o.shipmentId), o]));
+  const billedShipmentIds = new Set<string>();
   const result: ReconciliationRow[] = [];
 
   // Process provider rows (only MELI type)
   for (const row of provRows.filter(r => r.tipo === "MELI" || !r.tipo)) {
-    const order = orderById.get(row.idMeli);
-    billedIds.add(row.idMeli);
+    const order = orderByShipment.get(row.shipmentId);
+    billedShipmentIds.add(row.shipmentId);
 
     if (!order) {
       result.push({ ...row, status: "not_found" });
@@ -169,9 +170,9 @@ function reconcile(provRows: ProveedorRow[], orders: Order[], monthKey: string):
 
   // Find FLEX orders not billed
   for (const order of flexOrders) {
-    if (!billedIds.has(String(order.orderId))) {
+    if (!billedShipmentIds.has(String(order.shipmentId))) {
       result.push({
-        idMeli: String(order.orderId),
+        shipmentId: String(order.shipmentId),
         numProveedor: "",
         fechaEntrega: order.fecha,
         zona: order.departamentoEntrega,
@@ -566,7 +567,7 @@ export default function LogisticaTab({ orders, logisticaMonths, onSave, onDelete
                         return (
                           <tr key={i} className={`border-b border-brand-border/40 ${rowClass}`}>
                             <td className="px-3 py-2 text-center">{statusIcon}</td>
-                            <td className="px-3 py-2 font-mono text-brand-sub">{row.idMeli || "—"}</td>
+                            <td className="px-3 py-2 font-mono text-brand-sub">{row.shipmentId || "—"}</td>
                             <td className="px-3 py-2 font-mono text-brand-sub whitespace-nowrap">{row.fechaEntrega}</td>
                             <td className="px-3 py-2 font-mono text-brand-sub">{row.zona}</td>
                             <td className="px-3 py-2 font-mono text-brand-text font-bold">
