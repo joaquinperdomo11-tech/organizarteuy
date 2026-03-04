@@ -9,7 +9,7 @@ const WEBAPP_URL = process.env.NEXT_PUBLIC_APPS_SCRIPT_URL || "";
 // ── Types ────────────────────────────────────────────────────────
 interface ProveedorRow {
   numProveedor: string;
-  idMeli: string;
+  shipmentId: string;
   fechaEntrega: string;
   zona: string;
   precioProveedor: number;
