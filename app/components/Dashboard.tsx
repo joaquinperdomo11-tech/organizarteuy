@@ -202,22 +202,7 @@ export default function Dashboard() {
               )}
             </section>
 
-            {/* Tipo envío + Pagos + Cuotas */}
-            <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {loading ? (
-                <>
-                  <Skeleton className="h-72 rounded-2xl" />
-                  <Skeleton className="h-72 rounded-2xl" />
-                  <Skeleton className="h-72 rounded-2xl" />
-                </>
-              ) : (
-                <>
-                  <StatusChart data={data?.tipoEnvioBreakdown || []} />
-                  <MedioPagoChart allOrders={data?.orders || []} />
-                  <CuotasChart allOrders={data?.orders || []} />
-                </>
-              )}
-            </section>
+
 
             {/* Waterfall + Heatmap */}
             <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">

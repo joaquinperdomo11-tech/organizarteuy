@@ -100,7 +100,8 @@ export default function RevenueChart({ byDay, byMonth, currentMonthByDay, prevMo
 
   // Merge current, prev and projection by day (full month)
   const comparisonData = useMemo(() => {
-    const allDays = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+    const maxDays = Math.max(daysInMonth, prevMonthByDay.length > 0 ? Math.max(...prevMonthByDay.map(d => d.day)) : daysInMonth);
+    const allDays = Array.from({ length: maxDays }, (_, i) => i + 1);
     return allDays.map(d => {
       const cur  = currentMonthByDay.find(x => x.day === d);
       const prev = prevMonthByDay.find(x => x.day === d);
@@ -186,7 +187,7 @@ export default function RevenueChart({ byDay, byMonth, currentMonthByDay, prevMo
               Proyección {mesActual}: {metric === "orders" ? projTotal.toFixed(0) : formatCurrency(projTotal)}
             </p>
             <p className="text-brand-muted text-xs font-mono">
-              Día {daysElapsed} de {daysInMonth} · basada en patrón de {mesAnterior}
+              Día {daysElapsed} de {daysInMonth} · tendencia últimos {Math.min(7, daysElapsed)} días
             </p>
           </div>
           <div className="flex-1 min-w-32">
