@@ -26,6 +26,23 @@ export interface Order {
   departamentoEntrega: string;
 }
 
+export interface LogisticaRow {
+  numProveedor: string;
+  idMeli: string;
+  fechaEntrega: string;
+  zona: string;
+  precioProveedor: number;
+  estadoProveedor: string;
+  repartidor: string;
+  direccion: string;
+  tipo: string;
+}
+
+export interface LogisticaMonth {
+  monthKey: string;
+  rows: LogisticaRow[];
+}
+
 export interface StockItem {
   "Item ID ML": string;
   "SKU": string;
@@ -92,6 +109,7 @@ export interface DashboardData {
   revenueCurrentMonth: { day: number; revenue: number; margen: number; orders: number }[];
   revenuePrevMonth: { day: number; revenue: number; margen: number; orders: number }[];
   stock: StockItem[];
+  logistica: LogisticaMonth[];
 }
 
 const ENVIO_COLORS: Record<string, string> = {
@@ -130,6 +148,7 @@ export async function fetchDashboardData(): Promise<DashboardData> {
   // Handle both old format (array) and new format ({orders, stock})
   const rawOrders: Record<string, unknown>[] = Array.isArray(json) ? json : (json.orders || []);
   const rawStock: StockItem[] = Array.isArray(json) ? [] : (json.stock || []);
+  const rawLogistica: LogisticaMonth[] = Array.isArray(json) ? [] : (json.logistica || []);
 
   if (!Array.isArray(rawOrders)) throw new Error("El Apps Script no devolvió un array JSON válido.");
 
@@ -163,7 +182,7 @@ export async function fetchDashboardData(): Promise<DashboardData> {
     departamentoEntrega: String(r["Departamento Entrega"] ?? ""),
   }));
 
-  return processData(orders, rawStock);
+  return processData(orders, rawStock, rawLogistica);
 }
 
 function parseHora(horaStr: string): number {
@@ -178,7 +197,7 @@ function parseHora(horaStr: string): number {
   return 0;
 }
 
-function processData(orders: Order[], stock: StockItem[] = []): DashboardData {
+function processData(orders: Order[], stock: StockItem[] = [], logistica: LogisticaMonth[] = []): DashboardData {
   const totalRevenue = orders.reduce((s, o) => s + o.totalItem, 0);
   const totalMargen = orders.reduce((s, o) => s + o.margenReal, 0);
   const totalComisiones = orders.reduce((s, o) => s + o.comisionML, 0);
@@ -442,6 +461,7 @@ function processData(orders: Order[], stock: StockItem[] = []): DashboardData {
     return {
     orders,
     stock,
+    logistica,
     summary: {
       totalRevenue,
       totalMargen,
