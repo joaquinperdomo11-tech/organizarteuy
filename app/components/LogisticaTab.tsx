@@ -473,6 +473,8 @@ export default function LogisticaTab({ orders, logisticaMonths, onSave, onDelete
                 <p className="text-green-400 text-sm font-mono">✅ Guardado correctamente en Sheets. Seleccioná el mes abajo para ver la reconciliación.</p>
               </div>
             )}
+
+            {parseError && (
               <div className="mt-3 bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3">
                 <p className="text-red-400 text-sm font-mono">{parseError}</p>
               </div>
