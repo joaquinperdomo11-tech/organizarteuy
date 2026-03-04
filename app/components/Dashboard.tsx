@@ -256,7 +256,7 @@ export default function Dashboard() {
             orders={data?.orders || []}
             logisticaMonths={data?.logistica || []}
             onSave={async (month) => {
-              const res = await fetch(process.env.NEXT_PUBLIC_APPS_SCRIPT_URL || "", {
+              const res = await fetch("/api/script", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ action: "guardarLogistica", data: month }),
@@ -265,7 +265,7 @@ export default function Dashboard() {
               if (!json.ok) throw new Error(json.error);
             }}
             onDelete={async (monthKey) => {
-              await fetch(process.env.NEXT_PUBLIC_APPS_SCRIPT_URL || "", {
+              await fetch("/api/script", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ action: "eliminarLogistica", monthKey }),

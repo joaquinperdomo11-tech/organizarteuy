@@ -80,7 +80,7 @@ export function monthKeyToLabel(key: string): string {
 const WEBAPP_URL = process.env.NEXT_PUBLIC_APPS_SCRIPT_URL || "";
 
 async function callScript(action: string, data?: any) {
-  const res = await fetch(WEBAPP_URL, {
+  const res = await fetch("/api/script", {
     method: "POST",
     headers: { "Content-Type": "text/plain" }, // Apps Script requires text/plain for doPost
     body: JSON.stringify({ action, ...data }),
