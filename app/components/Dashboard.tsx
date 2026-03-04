@@ -11,6 +11,7 @@ import SalesHeatmap from "./SalesHeatmap";
 import SkuPerformance from "./SkuPerformance";
 import UruguayMap from "./UruguayMap";
 import MontevideoMap from "./MontevideoMap";
+import GeoTab from "./GeoTab";
 import StockDashboard from "./StockDashboard";
 import AdsTab from "./AdsTab";
 import { AdsProvider } from "./AdsContext";
@@ -253,28 +254,7 @@ export default function Dashboard() {
             TAB: GEOGRÁFICO
         ══════════════════════════════════════════════════════════ */}
         {activeTab === "geografico" && (
-          <div className="space-y-8">
-            <section>
-              {loading ? <Skeleton className="h-[600px] rounded-2xl" /> : (
-                <UruguayMap orders={(data?.orders || []).map(o => ({
-                  departamentoEntrega: o.departamentoEntrega || "",
-                  ciudadEntrega: o.ciudadEntrega || "",
-                  totalItem: o.totalItem,
-                  fecha: o.fecha,
-                }))} />
-              )}
-            </section>
-            <section>
-              {loading ? <Skeleton className="h-[600px] rounded-2xl" /> : (
-                <MontevideoMap orders={(data?.orders || []).map(o => ({
-                  departamentoEntrega: o.departamentoEntrega || "",
-                  ciudadEntrega: o.ciudadEntrega || "",
-                  totalItem: o.totalItem,
-                  fecha: o.fecha,
-                }))} />
-              )}
-            </section>
-          </div>
+          <GeoTab orders={data?.orders || []} loading={loading} revenueByMonth={data?.revenueByMonth || []} />
         )}
 
         {/* ══════════════════════════════════════════════════════════
