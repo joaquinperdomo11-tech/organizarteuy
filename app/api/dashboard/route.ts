@@ -4,13 +4,14 @@ import { fetchDashboardData } from "@/lib/sheets";
 // Revalidate cache every 5 minutes
 export const revalidate = parseInt(process.env.REVALIDATE_SECONDS || "300");
 
-export async function GET() {
+export async function GET(request: Request) {
+  const noCache = request.url.includes("?t=");
   try {
     const data = await fetchDashboardData();
     return NextResponse.json(data, {
-      headers: {
-        "Cache-Control": `s-maxage=${revalidate}, stale-while-revalidate`,
-      },
+      headers: noCache
+        ? { "Cache-Control": "no-store" }
+        : { "Cache-Control": `s-maxage=${revalidate}, stale-while-revalidate` },
     });
   } catch (error) {
     console.error("Dashboard API error:", error);
