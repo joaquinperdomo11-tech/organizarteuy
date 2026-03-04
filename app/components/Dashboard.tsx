@@ -1,4 +1,5 @@
 "use client";
+import LoginGate from "./LoginGate";
 import { useEffect, useState, useCallback, useMemo } from "react";
 import type { DashboardData } from "@/lib/sheets";
 import StatCard from "./StatCard";
@@ -64,7 +65,7 @@ export default function Dashboard() {
     return () => clearInterval(interval);
   }, [fetchData]);
 
-  const { currentMonth, prevMonth, projection } = data || {};
+  const { currentMonth, prevMonth } = data || {};
 
   function pct(cur?: number, prev?: number) {
     if (!prev || prev === 0) return undefined;
@@ -73,6 +74,7 @@ export default function Dashboard() {
 
   return (
     <AdsProvider>
+    <LoginGate>
     <div className="min-h-screen">
       {/* ── Header ─────────────────────────────────────────────── */}
       <header className="border-b border-brand-border bg-brand-dark/80 backdrop-blur-sm sticky top-0 z-50">
@@ -166,11 +168,11 @@ export default function Dashboard() {
                 {loading ? Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-36 rounded-2xl" />) : (
                   <>
                     <div className="col-span-2 sm:col-span-1">
-                      <StatCard label="Ingresos brutos" value={currentMonth?.revenue || 0} prefix="$" accent delay={0} icon="💰" trend={pct(currentMonth?.revenue, prevMonth?.revenue)} invertTrend={false} proj={projection?.projectedRevenue} />
+                      <StatCard label="Ingresos brutos" value={currentMonth?.revenue || 0} prefix="$" accent delay={0} icon="💰" trend={pct(currentMonth?.revenue, prevMonth?.revenue)} invertTrend={false} />
                     </div>
                     <StatCard label="Comisiones MELI" value={currentMonth?.comisiones || 0} prefix="$" delay={80} icon="🏦" trend={pct(currentMonth?.comisiones, prevMonth?.comisiones)} invertTrend={true} />
                     <StatCard label="Costo envíos neto" value={currentMonth?.envios || 0} prefix="$" delay={160} icon="📦" trend={pct(currentMonth?.envios, prevMonth?.envios)} invertTrend={true} />
-                    <StatCard label="Margen real" value={currentMonth?.margen || 0} prefix="$" delay={240} icon="📈" sub={`${currentMonth?.margenPct.toFixed(1) || 0}% del total`} trend={pct(currentMonth?.margen, prevMonth?.margen)} invertTrend={false} proj={projection?.projectedMargen} />
+                    <StatCard label="Margen real" value={currentMonth?.margen || 0} prefix="$" delay={240} icon="📈" sub={`${currentMonth?.margenPct.toFixed(1) || 0}% del total`} trend={pct(currentMonth?.margen, prevMonth?.margen)} invertTrend={false} />
                     <StatCard label="Ticket promedio" value={currentMonth?.avgOrderValue || 0} prefix="$" delay={320} icon="🎯" sub={`Margen prom. $${currentMonth?.avgMargen.toFixed(0) || 0}`} trend={pct(currentMonth?.avgOrderValue, prevMonth?.avgOrderValue)} invertTrend={false} />
                   </>
                 )}
@@ -186,7 +188,7 @@ export default function Dashboard() {
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 {loading ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28 rounded-2xl" />) : (
                   <>
-                    <StatCard label="Total órdenes" value={currentMonth?.orders || 0} delay={0} icon="🛒" trend={pct(currentMonth?.orders, prevMonth?.orders)} proj={projection?.projectedOrders} />
+                    <StatCard label="Total órdenes" value={currentMonth?.orders || 0} delay={0} icon="🛒" trend={pct(currentMonth?.orders, prevMonth?.orders)} />
                     <StatCard label="Unidades vendidas" value={currentMonth?.units || 0} delay={80} icon="📊" trend={pct(currentMonth?.units, prevMonth?.units)} />
                     <StatCard label="Margen %" value={currentMonth?.margenPct || 0} suffix="%" decimals={1} delay={160} icon="💹" trend={pct(currentMonth?.margenPct, prevMonth?.margenPct)} />
                     <StatCard label="Margen por orden" value={currentMonth?.avgMargen || 0} prefix="$" delay={240} icon="⚡" trend={pct(currentMonth?.avgMargen, prevMonth?.avgMargen)} />
@@ -198,7 +200,7 @@ export default function Dashboard() {
             {/* Gráfico */}
             <section>
               {loading ? <Skeleton className="h-80 rounded-2xl" /> : (
-                <RevenueChart byDay={data?.revenueByDay || []} byMonth={data?.revenueByMonth || []} currentMonthByDay={data?.revenueCurrentMonth || []} prevMonthByDay={data?.revenuePrevMonth || []} projection={data?.projection || { projectedRevenue: 0, projectedMargen: 0, projectedOrders: 0, daysElapsed: 0, daysInMonth: 30, dailyData: [] }} />
+                <RevenueChart byDay={data?.revenueByDay || []} byMonth={data?.revenueByMonth || []} currentMonthByDay={data?.revenueCurrentMonth || []} prevMonthByDay={data?.revenuePrevMonth || []} />
               )}
             </section>
 
@@ -329,6 +331,7 @@ export default function Dashboard() {
         </p>
       </footer>
     </div>
+    </LoginGate>
     </AdsProvider>
   );
 }

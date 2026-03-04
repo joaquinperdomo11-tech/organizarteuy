@@ -14,7 +14,6 @@ interface StatCardProps {
   icon?: string;
   trend?: number;
   invertTrend?: boolean;
-  proj?: number; // projected end-of-month value
 }
 
 function useCountUp(target: number, duration = 1200, delay = 0) {
@@ -55,7 +54,6 @@ export default function StatCard({
   icon,
   trend,
   invertTrend = false,
-  proj,
 }: StatCardProps) {
   const animated = useCountUp(value, 1000, delay);
 
@@ -64,23 +62,15 @@ export default function StatCard({
     maximumFractionDigits: decimals,
   });
 
-  function fmtProj(v: number) {
-    if (suffix === "%") return `${v.toFixed(1)}%`;
-    if (prefix === "$") {
-      if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(1)}M`;
-      if (v >= 1_000) return `$${(v / 1_000).toFixed(0)}K`;
-      return `$${v.toFixed(0)}`;
-    }
     if (v >= 1_000) return `${(v / 1_000).toFixed(0)}K`;
     return v.toFixed(0);
   }
 
-  const showProj = proj !== undefined && proj > 0 && proj > value * 1.01;
 
   return (
     <div
       className={clsx(
-        "relative overflow-hidden rounded-2xl border p-6 transition-all duration-300",
+        "relative overflow-hidden rounded-2xl border p-4 sm:p-6 transition-all duration-300",
         "hover:border-brand-muted hover:translate-y-[-2px]",
         accent
           ? "border-brand-yellow/30 bg-brand-yellow/5"
@@ -115,7 +105,7 @@ export default function StatCard({
           <span
             className={clsx(
               "font-display font-bold leading-none",
-              accent ? "text-brand-yellow text-4xl" : "text-brand-text text-3xl"
+              accent ? "text-brand-yellow text-3xl sm:text-4xl" : "text-brand-text text-2xl sm:text-3xl"
             )}
           >
             {formatted}
@@ -145,11 +135,9 @@ export default function StatCard({
           </div>
         )}
 
-        {showProj && (
           <div className="flex items-center gap-1.5 mt-2">
             <svg width="16" height="2"><line x1="0" y1="1" x2="16" y2="1" stroke="#AA88FF" strokeWidth="1.5" strokeDasharray="4,2"/></svg>
             <span className="text-[#AA88FF] text-xs font-mono">
-              proj. {fmtProj(proj!)}
             </span>
           </div>
         )}
