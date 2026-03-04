@@ -166,10 +166,18 @@ export default function MontevideoMap({ orders, selectedMonths }: MontevideoMapP
   const geoLookup = useMemo(() => {
     const lookup: Record<string, { count: number; revenue: number }> = {};
     Object.entries(barrioData).forEach(([barrio, vals]) => {
-      const geoFeature = (MONTEVIDEO_GEOJSON.features as any[]).find(f => {
-        const geoNorm = normalizeBarrio(f.properties.name);
-        return geoNorm === barrio || geoNorm.includes(barrio) || barrio.includes(geoNorm);
-      });
+      // Prefer exact match, only fall back to partial if no exact found
+      const geoFeature =
+        (MONTEVIDEO_GEOJSON.features as any[]).find(f => normalizeBarrio(f.properties.name) === barrio) ||
+        (MONTEVIDEO_GEOJSON.features as any[]).find(f => {
+          const geoNorm = normalizeBarrio(f.properties.name);
+          // Only allow partial if the shorter one is a full word boundary match
+          // e.g. "MALVIN" should NOT match "MALVIN NORTE"
+          return geoNorm !== barrio && (
+            geoNorm === barrio + " " || // exact prefix with space
+            false // disable loose partial matching
+          );
+        });
       if (geoFeature) {
         const key = geoFeature.properties.name;
         if (!lookup[key]) lookup[key] = { count: 0, revenue: 0 };
