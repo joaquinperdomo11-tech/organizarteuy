@@ -143,14 +143,14 @@ function reconcile(provRows: ProveedorRow[], orders: Order[], monthKey: string):
     return key === monthKey && o.tipoEnvio === "FLEX";
   });
 
-  const orderByShipment = new Map(flexOrders.map(o => [String(o.shipmentId), o]));
+  const orderByShipment = new Map(flexOrders.map(o => [String(parseInt(o.shipmentId) || 0), o]));
   const billedShipmentIds = new Set<string>();
   const result: ReconciliationRow[] = [];
 
   // Process provider rows (only MELI type)
   for (const row of provRows.filter(r => r.tipo === "MELI" || !r.tipo)) {
-    const order = orderByShipment.get(row.shipmentId);
-    billedShipmentIds.add(row.shipmentId);
+    const order = orderByShipment.get(String(parseInt(row.shipmentId) || 0));
+    billedShipmentIds.add(String(parseInt(row.shipmentId) || 0));
 
     if (!order) {
       result.push({ ...row, status: "not_found" });
@@ -170,7 +170,7 @@ function reconcile(provRows: ProveedorRow[], orders: Order[], monthKey: string):
 
   // Find FLEX orders not billed
   for (const order of flexOrders) {
-    if (!billedShipmentIds.has(String(order.shipmentId))) {
+    if (!billedShipmentIds.has(String(parseInt(order.shipmentId) || 0))) {
       result.push({
         shipmentId: String(order.shipmentId),
         numProveedor: "",
