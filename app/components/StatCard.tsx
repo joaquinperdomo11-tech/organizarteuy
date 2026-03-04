@@ -62,11 +62,6 @@ export default function StatCard({
     maximumFractionDigits: decimals,
   });
 
-    if (v >= 1_000) return `${(v / 1_000).toFixed(0)}K`;
-    return v.toFixed(0);
-  }
-
-
   return (
     <div
       className={clsx(
@@ -78,67 +73,44 @@ export default function StatCard({
       )}
       style={{ animationDelay: `${delay}ms` }}
     >
-      {/* Background glow */}
       {accent && (
         <div className="absolute -top-8 -right-8 w-32 h-32 bg-brand-yellow/10 rounded-full blur-2xl" />
       )}
 
       <div className="relative">
         <div className="flex items-start justify-between mb-3">
-          <p className="text-brand-sub text-sm font-body uppercase tracking-wider">
+          <p className="text-brand-sub text-xs sm:text-sm font-body uppercase tracking-wider">
             {label}
           </p>
-          {icon && <span className="text-xl">{icon}</span>}
+          {icon && <span className="text-lg sm:text-xl">{icon}</span>}
         </div>
 
         <div className="flex items-baseline gap-1">
           {prefix && (
-            <span
-              className={clsx(
-                "text-sm font-mono",
-                accent ? "text-brand-yellow" : "text-brand-sub"
-              )}
-            >
+            <span className={clsx("text-sm font-mono", accent ? "text-brand-yellow" : "text-brand-sub")}>
               {prefix}
             </span>
           )}
-          <span
-            className={clsx(
-              "font-display font-bold leading-none",
-              accent ? "text-brand-yellow text-3xl sm:text-4xl" : "text-brand-text text-2xl sm:text-3xl"
-            )}
-          >
+          <span className={clsx(
+            "font-display font-bold leading-none",
+            accent ? "text-brand-yellow text-3xl sm:text-4xl" : "text-brand-text text-2xl sm:text-3xl"
+          )}>
             {formatted}
           </span>
-          {suffix && (
-            <span className="text-brand-sub text-sm font-mono">{suffix}</span>
-          )}
+          {suffix && <span className="text-brand-sub text-sm font-mono">{suffix}</span>}
         </div>
 
         {sub && <p className="text-brand-sub text-xs mt-2 font-body">{sub}</p>}
 
         {trend !== undefined && (
-          <div
-            className={clsx(
-              "inline-flex items-center gap-1 mt-3 px-2 py-0.5 rounded-full text-xs font-mono",
-              invertTrend
-                ? trend <= 0
-                  ? "bg-green-500/10 text-green-400"
-                  : "bg-red-500/10 text-red-400"
-                : trend >= 0
-                  ? "bg-green-500/10 text-green-400"
-                  : "bg-red-500/10 text-red-400"
-            )}
-          >
+          <div className={clsx(
+            "inline-flex items-center gap-1 mt-3 px-2 py-0.5 rounded-full text-xs font-mono",
+            invertTrend
+              ? trend <= 0 ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"
+              : trend >= 0 ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"
+          )}>
             <span>{trend >= 0 ? "▲" : "▼"}</span>
             <span>{Math.abs(trend).toFixed(1)}% vs mes anterior</span>
-          </div>
-        )}
-
-          <div className="flex items-center gap-1.5 mt-2">
-            <svg width="16" height="2"><line x1="0" y1="1" x2="16" y2="1" stroke="#AA88FF" strokeWidth="1.5" strokeDasharray="4,2"/></svg>
-            <span className="text-[#AA88FF] text-xs font-mono">
-            </span>
           </div>
         )}
       </div>
