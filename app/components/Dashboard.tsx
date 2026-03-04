@@ -39,10 +39,10 @@ export default function Dashboard() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>("resumen");
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (noCache = false) => {
     setLoading(true);
     try {
-      const res = await fetch("/api/dashboard");
+      const res = await fetch("/api/dashboard" + (noCache ? "?t=" + Date.now() : ""), { cache: noCache ? "no-store" : "default" });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.details || `Error ${res.status}`);
@@ -263,7 +263,7 @@ export default function Dashboard() {
               });
               const json = await res.json();
               if (!json.ok) throw new Error(json.error);
-              await fetchData();
+              await fetchData(true);
             }}
             onDelete={async (monthKey) => {
               await fetch("/api/script", {
@@ -271,7 +271,7 @@ export default function Dashboard() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ action: "eliminarLogistica", monthKey }),
               });
-              await fetchData();
+              await fetchData(true);
             }}
           />
         )}
