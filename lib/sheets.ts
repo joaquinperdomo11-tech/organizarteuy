@@ -91,14 +91,6 @@ export interface DashboardData {
   };
   revenueCurrentMonth: { day: number; revenue: number; margen: number; orders: number }[];
   revenuePrevMonth: { day: number; revenue: number; margen: number; orders: number }[];
-  projection: {
-    projectedRevenue: number;
-    projectedMargen: number;
-    projectedOrders: number;
-    daysElapsed: number;
-    daysInMonth: number;
-    dailyData: { day: number; revenue: number; margen: number; orders: number }[];
-  };
   stock: StockItem[];
 }
 
@@ -445,82 +437,7 @@ function processData(orders: Order[], stock: StockItem[] = []): DashboardData {
     });
   }
 
-  // ── Proyección por regresión lineal (últimos 7 días) ──────────
-  const daysInMonth = new Date(curYear, curMonth + 1, 0).getDate();
-  const daysElapsed = curDay;
-  const daysRemaining = daysInMonth - daysElapsed;
-
-  // Construir array día a día del mes actual
-  const curDayData: { day: number; revenue: number; margen: number; orders: number }[] = [];
-  for (let d = 1; d <= daysElapsed; d++) {
-    const dayOrds = currentMonthOrders.filter(o => new Date(o.fecha).getDate() === d);
-    curDayData.push({
-      day: d,
-      revenue: dayOrds.reduce((s, o) => s + o.totalItem, 0),
-      margen:  dayOrds.reduce((s, o) => s + o.margenReal, 0),
-      orders:  dayOrds.length,
-    });
-  }
-
-  // Regresión lineal simple: y = a + b*x
-  function linReg(points: { x: number; y: number }[]): { a: number; b: number } {
-    const n = points.length;
-    if (n === 0) return { a: 0, b: 0 };
-    if (n === 1) return { a: points[0].y, b: 0 };
-    const sumX  = points.reduce((s, p) => s + p.x, 0);
-    const sumY  = points.reduce((s, p) => s + p.y, 0);
-    const sumXY = points.reduce((s, p) => s + p.x * p.y, 0);
-    const sumX2 = points.reduce((s, p) => s + p.x * p.x, 0);
-    const b = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX || 1);
-    const a = (sumY - b * sumX) / n;
-    return { a, b };
-  }
-
-  // Ventana de últimos 7 días (o menos si no hay suficientes)
-  const WINDOW = 7;
-  const windowData = curDayData.slice(-Math.min(WINDOW, daysElapsed));
-
-  const regRevenue = linReg(windowData.map(d => ({ x: d.day, y: d.revenue })));
-  const regMargen  = linReg(windowData.map(d => ({ x: d.day, y: d.margen })));
-  const regOrders  = linReg(windowData.map(d => ({ x: d.day, y: d.orders })));
-
-  // Proyectar días restantes usando la tendencia
-  const projectionDailyData: { day: number; revenue: number; margen: number; orders: number }[] = [
-    ...curDayData, // días reales
-  ];
-
-  for (let d = daysElapsed + 1; d <= daysInMonth; d++) {
-    projectionDailyData.push({
-      day: d,
-      revenue: Math.max(0, regRevenue.a + regRevenue.b * d),
-      margen:  Math.max(0, regMargen.a  + regMargen.b  * d),
-      orders:  Math.max(0, regOrders.a  + regOrders.b  * d),
-    });
-  }
-
-  // Total proyectado = acumulado real + suma de días proyectados
-  const curTotalRevenue = currentMonthOrders.reduce((s, o) => s + o.totalItem, 0);
-  const curTotalMargen  = currentMonthOrders.reduce((s, o) => s + o.margenReal, 0);
-  const curTotalOrders  = currentMonthOrders.length;
-
-  const projectedRevenue = curTotalRevenue + projectionDailyData
-    .filter(d => d.day > daysElapsed)
-    .reduce((s, d) => s + d.revenue, 0);
-  const projectedMargen = curTotalMargen + projectionDailyData
-    .filter(d => d.day > daysElapsed)
-    .reduce((s, d) => s + d.margen, 0);
-  const projectedOrders = curTotalOrders + projectionDailyData
-    .filter(d => d.day > daysElapsed)
-    .reduce((s, d) => s + d.orders, 0);
-
-  const projection = {
-    projectedRevenue,
-    projectedMargen,
-    projectedOrders,
-    daysElapsed,
-    daysInMonth,
-    dailyData: projectionDailyData,
-  };
+;
 
     return {
     orders,
@@ -549,6 +466,5 @@ function processData(orders: Order[], stock: StockItem[] = []): DashboardData {
     prevMonth: prevMonthData,
     revenueCurrentMonth,
     revenuePrevMonth,
-    projection,
   };
 }
