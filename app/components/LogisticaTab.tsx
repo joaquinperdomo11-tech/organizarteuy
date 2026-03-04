@@ -32,6 +32,8 @@ interface ReconciliationRow {
   precioProveedor: number;
   repartidor: string;
   direccion: string;
+  tipo: string;
+  estadoProveedor: string;
   // from ML orders
   orderId?: string;
   producto?: string;
