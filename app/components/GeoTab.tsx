@@ -52,7 +52,7 @@ export default function GeoTab({ orders, loading, revenueByMonth }: GeoTabProps)
   const selectYear = (year: number) => setSelectedMonths(availableMonths.filter(m => m.startsWith(String(year))));
   const clearAll = () => setSelectedMonths([]);
 
-  const availableYears = [...new Set(availableMonths.map(m => m.split("-")[0]))].sort();
+  const availableYears = Array.from(new Set(availableMonths.map(m => m.split("-")[0]))).sort();
 
   const mapOrders = useMemo(() =>
     orders.map(o => ({
