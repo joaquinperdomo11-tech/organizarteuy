@@ -148,7 +148,14 @@ export async function fetchDashboardData(): Promise<DashboardData> {
   // Handle both old format (array) and new format ({orders, stock})
   const rawOrders: Record<string, unknown>[] = Array.isArray(json) ? json : (json.orders || []);
   const rawStock: StockItem[] = Array.isArray(json) ? [] : (json.stock || []);
-  const rawLogistica: LogisticaMonth[] = Array.isArray(json) ? [] : (json.logistica || []);
+  const rawLogistica: LogisticaMonth[] = (Array.isArray(json) ? [] : (json.logistica || [])).map((m: LogisticaMonth) => {
+    let key = m.monthKey;
+    if (key && (key.length > 7 || key.includes("Jan") || key.includes("Feb"))) {
+      const d = new Date(key);
+      if (!isNaN(d.getTime())) key = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+    }
+    return { ...m, monthKey: key };
+  });
 
   if (!Array.isArray(rawOrders)) throw new Error("El Apps Script no devolvió un array JSON válido.");
 
