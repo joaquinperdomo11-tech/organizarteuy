@@ -263,6 +263,7 @@ export default function Dashboard() {
               });
               const json = await res.json();
               if (!json.ok) throw new Error(json.error);
+              await fetchData();
             }}
             onDelete={async (monthKey) => {
               await fetch("/api/script", {
@@ -270,6 +271,7 @@ export default function Dashboard() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ action: "eliminarLogistica", monthKey }),
               });
+              await fetchData();
             }}
           />
         )}

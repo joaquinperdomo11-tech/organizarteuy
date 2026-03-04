@@ -213,6 +213,7 @@ export default function LogisticaTab({ orders, logisticaMonths, onSave, onDelete
   const [parseError, setParseError]   = useState("");
   const [parsedPreview, setParsedPreview] = useState<{ rows: ProveedorRow[]; monthKey: string } | null>(null);
   const [saving, setSaving]           = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
   const [mapMonths, setMapMonths]     = useState<string[]>([]);
 
   // KPI data
@@ -308,6 +309,8 @@ export default function LogisticaTab({ orders, logisticaMonths, onSave, onDelete
       await onSave({ monthKey: parsedPreview.monthKey, rows: parsedPreview.rows });
       setSelectedMonth(parsedPreview.monthKey);
       setParsedPreview(null);
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 4000);
     } finally {
       setSaving(false);
     }
@@ -465,7 +468,11 @@ export default function LogisticaTab({ orders, logisticaMonths, onSave, onDelete
               <span className="text-brand-muted text-xs font-mono mt-1">Estado_de_Cuenta_*.pdf</span>
             </label>
 
-            {parseError && (
+            {saveSuccess && (
+              <div className="mt-3 bg-green-500/10 border border-green-500/30 rounded-xl px-4 py-3">
+                <p className="text-green-400 text-sm font-mono">✅ Guardado correctamente en Sheets. Seleccioná el mes abajo para ver la reconciliación.</p>
+              </div>
+            )}
               <div className="mt-3 bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3">
                 <p className="text-red-400 text-sm font-mono">{parseError}</p>
               </div>
