@@ -9,9 +9,7 @@ import OrdersTable from "./OrdersTable";
 import WaterfallChart from "./WaterfallChart";
 import SalesHeatmap from "./SalesHeatmap";
 import SkuPerformance from "./SkuPerformance";
-import UruguayMap from "./UruguayMap";
-import MontevideoMap from "./MontevideoMap";
-import GeoTab from "./GeoTab";
+import LogisticaTab from "./LogisticaTab";
 import StockDashboard from "./StockDashboard";
 import AdsTab from "./AdsTab";
 import { AdsProvider } from "./AdsContext";
@@ -23,12 +21,12 @@ function Skeleton({ className }: { className: string }) {
   return <div className={`skeleton ${className}`} />;
 }
 
-type Tab = "resumen" | "productos" | "geografico" | "stock" | "ordenes" | "publicidad";
+type Tab = "resumen" | "productos" | "logistica" | "stock" | "ordenes" | "publicidad";
 
 const TABS: { key: Tab; label: string; icon: string }[] = [
   { key: "resumen", label: "Resumen", icon: "📊" },
   { key: "productos", label: "Productos & SKU", icon: "📦" },
-  { key: "geografico", label: "Geográfico", icon: "🗺️" },
+  { key: "logistica", label: "Logística", icon: "🚚" },
   { key: "stock", label: "Stock", icon: "📋" },
   { key: "ordenes", label: "Órdenes", icon: "🛒" },
   { key: "publicidad", label: "Publicidad", icon: "📣" },
@@ -253,8 +251,27 @@ export default function Dashboard() {
         {/* ══════════════════════════════════════════════════════════
             TAB: GEOGRÁFICO
         ══════════════════════════════════════════════════════════ */}
-        {activeTab === "geografico" && (
-          <GeoTab orders={data?.orders || []} loading={loading} revenueByMonth={data?.revenueByMonth || []} />
+        {activeTab === "logistica" && (
+          <LogisticaTab
+            orders={data?.orders || []}
+            logisticaMonths={data?.logistica || []}
+            onSave={async (month) => {
+              const res = await fetch(process.env.NEXT_PUBLIC_APPS_SCRIPT_URL || "", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ action: "guardarLogistica", data: month }),
+              });
+              const json = await res.json();
+              if (!json.ok) throw new Error(json.error);
+            }}
+            onDelete={async (monthKey) => {
+              await fetch(process.env.NEXT_PUBLIC_APPS_SCRIPT_URL || "", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ action: "eliminarLogistica", monthKey }),
+              });
+            }}
+          />
         )}
 
         {/* ══════════════════════════════════════════════════════════
